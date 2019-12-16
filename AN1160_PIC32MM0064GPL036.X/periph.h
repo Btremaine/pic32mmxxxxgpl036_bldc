@@ -3,7 +3,7 @@
  * this software and any derivatives exclusively with Microchip products.
  *
  * This software and any accompanying information is for suggestion only.
- * It does not modify Microchip's standard warranty for its products.
+ * It does not modify Microchips standard warranty for its products.
  * You agree that you are solely responsible for testing the software and
  * determining its suitability.  Microchip has no obligation to modify,
  * test, certify, or support the software.

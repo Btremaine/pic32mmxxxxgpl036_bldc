@@ -3,7 +3,7 @@
  * this software and any derivatives exclusively with Microchip products.
  *
  * This software and any accompanying information is for suggestion only.
- * It does not modify Microchip's standard warranty for its products.
+ * It does not modify Microchips standard warranty for its products.
  * You agree that you are solely responsible for testing the software and
  * determining its suitability.  Microchip has no obligation to modify,
  * test, certify, or support the software.
@@ -91,6 +91,8 @@ void Init_Peripheral(void)
     SPLLCONbits.PLLODIV = 0;
     SPLLCONbits.PLLMULT = 1;
     SPLLCONbits.PLLICLK = 1;
+    REFO1CONbits.ON = 1;     // debug, output sys clock
+    REFO1CONbits.OE = 1;
     SYSKEY = 0x0;
     while(OSCCON & 0x0001);
     Nop();
@@ -103,45 +105,50 @@ void Init_Peripheral(void)
     Nop();
 
     // Configure Digital PORTS multiplexed with MCCP as outputs
-    LATAbits.LATA0 = 0;     //PWM1H3
+    LATAbits.LATA0 = 0;     //PWM1H3, <also LED1 on Dev Board>
     TRISAbits.TRISA0 = 0;
     LATAbits.LATA1 = 0;     //PWM1L3
     TRISAbits.TRISA1 = 0;
-    LATAbits.LATA2 = 0;     //PWM1H2
+    LATAbits.LATA2 = 0;     //PWM1H2, <also RGB_BLE on Dev Board>
     TRISAbits.TRISA2 = 0;
     LATAbits.LATA3 = 0;     //PWM1L2
     TRISAbits.TRISA3 = 0;
-    LATBbits.LATB8 = 0;     //PWM1H1
+    LATBbits.LATB8 = 0;     //PWM1H1, <also RB8_SCK on Dev Board>
     TRISBbits.TRISB8 = 0;
     LATBbits.LATB9 = 0;     //PWM1L1
     TRISBbits.TRISB9 = 0;
 
     // Push Button pins
-#if defined MCLV
-    LATCbits.LATC9 = 0;
-    TRISCbits.TRISC9 = 1;   //S2
-
-    LATAbits.LATA4 = 0;
-    TRISAbits.TRISA4 = 1;   //S3
-#elif defined MCHV
-    LATBbits.LATB4 = 0;
-    TRISBbits.TRISB4 = 1;   //S1
-#endif
+#if defined CURIOS_DEV
+    LATBbits.LATB7 = 0;     // S1
+    TRISBbits.TRISB7 = 1;
+ 
+    LATBbits.LATB13 = 0;     // S2
+    TRISBbits.TRISB13 = 1;
     
+    LATAbits.LATA0 = 0;      // LED1
+    TRISAbits.TRISA0 = 0;   
+    
+    LATCbits.LATC9 = 0;      // LED2
+    TRISCbits.TRISC9 = 0;
+    
+#endif
+  
     EnableInterrupts();
 }
 
 
 void Init_ADC(void)
 {
+    // clear all ADC's
     AD1CON1 = 0;
     AD1CON2 = 0;
     AD1CON3 = 0;
     AD1CON5 = 0;
 
-    AD1CON1 = 0x0064;
-    AD1CHSbits.CH0SA = 8; 
-    AD1CON3 = 0x0203;
+    AD1CON1 = 0x0064;          // format int-16bit, Timer1, 10-bit, Auto-start
+    AD1CHSbits.CH0SA = POT;
+    AD1CON3 = 0x0203;          // conversion clock and auto-sample time
     AD1CON2 = 0x0000;
     AD1CON5 = 0x0000;
     AD1CON1bits.DONE = 0;
@@ -197,11 +204,11 @@ void Init_MCCP(void)
 
 void Init_Timers(void)
 {
-    //Timer 1
+    // ======================== // Timer 1
     TMR1 = 0;                   // Resetting timer 1
     PR1 = ((FCY/FPWM)/7 - 1);   // // Frequency at which Timer1 triggers ADC. About 6 ADCs every PWM.
     T1CONbits.TCS = 0;
-
+    // ======================== // ?
     CCP2CON1bits.CCSEL = 0;     // Set SCCP2 operating mode
     CCP2CON1bits.MOD = 0;       // Set mode to 16/32 bit timer mode
     CCP2CON1bits.T32 = 0;       // Set timebase width (16-bit)
@@ -214,21 +221,20 @@ void Init_Timers(void)
     CCP2TMRbits.TMRL = 0;
     CCP2PRbits.PRH = 0;
     CCP2PRbits.PRL = 10;        // Configure timebase period. This is always changed in pre-commutation state.
-
+    // ========================= // ?
     CCP3CON1bits.CCSEL = 0;     // Set SCCP3 operating mode
-    CCP3CON1bits.T32 = 0;       // Set timebase width (16-bit)
     CCP3CON1bits.MOD = 0b0000;  // Set mode to 16/32 bit timer mode
-    CCP3CON1bits.SYNC = 0b00000;// No external synchronization; timer rolls over at FFFFh or matches with the Timer Period register
-
+    CCP3CON1bits.T32 = 0;       // Set timebase width (16-bit)
     CCP3CON1bits.TMRSYNC = 0;   // Set timebase synchronization (Synchronized)
     CCP3CON1bits.CLKSEL = 0b000;// Set the clock source (Tcy)
     CCP3CON1bits.TMRPS = 0b11;  // Set the clock pre-scaler (1:64)
     CCP3CON1bits.TRIGEN = 0;    // Set Sync/Triggered mode (Synchronous)
+    CCP3CON1bits.SYNC = 0b00000;// No external synchronization; timer rolls over at FFFFh or matches with the Timer Period register
     CCP3TMRbits.TMRH = 0;       // Initialize timer prior to enable module.
     CCP3TMRbits.TMRL = 0;
     CCP3PRbits.PRH = 0;
     CCP3PRbits.PRL = 0xffff;    // Configure timebase period. This timer does not need to overflow. Used only for counting time.
-
+    // ======================== // ?
     IPC8bits.CCT2IP = 5;        // Set SCCP2 Interrupt Priority Level
     IPC8bits.CCT2IS = 2;
     IFS1bits.CCT2IF = 0;        // Clear SCCP2 Interrupt Flag

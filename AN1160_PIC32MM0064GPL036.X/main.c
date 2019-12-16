@@ -3,7 +3,7 @@
  * this software and any derivatives exclusively with Microchip products.
  *
  * This software and any accompanying information is for suggestion only.
- * It does not modify Microchip's standard warranty for its products.
+ * It does not modify Microchips standard warranty for its products.
  * You agree that you are solely responsible for testing the software and
  * determining its suitability.  Microchip has no obligation to modify,
  * test, certify, or support the software.
@@ -30,6 +30,13 @@
  * MICROCHIP PROVIDES THIS SOFTWARE CONDITIONALLY UPON YOUR ACCEPTANCE OF
  * THESE TERMS.
  *
+ * 11/14/2019 Prysm Inc. Brian Tremaine
+ * Code base AN1160_PIC32MM0064GPL_MCLV_MCLV taken as starting point for
+ * Java project (Gen3).
+ * Rebuild for the PIC32MM Curiosity Development Board. (CURIOS_DEV0
+ *   S1: start/stop switch
+ *   S2: not used
+ * 
 * *****************************************************************************/
 #include "defs.h"		//defines, function headers, pi, etc
 #include <xc.h>
@@ -41,42 +48,29 @@ int32_t main(void)
     Init_MCCP();    	// MCCP initialization
     Init_ADC();         // Analog-Digital Converter initialization
     Init_Timers();  	// Timer1, SCCP2, SCCP3 initialization
-    
+      
     //defaults: CLKW rotation, motor stopped
     Flags.RunMotor = 0;
     Flags.Startup = 0;
-    Flags.CLKW = 0;
-    Flags.newCLKW = 0;
     Flags.DMCI_Control_SW = 0;		//default potentiometer read
-    DesiredRPM = STARTUP_RPM;
-    
+    DesiredRPM = STARTUP_RPM;      
     Flags.current_state = STATE_STOPPED;
-    while(1)
-    {
-#if defined MCLV
-        if(S2)
-        { //CLKW/CCLKW switch
-            while(S2) //debounce
-                DelayNmSec(DEBOUNCE_DELAY);
-            Flags.newCLKW = !Flags.CLKW;
-        }
-        if(S3)
-        { //start/stop switch
-            while(S3) //debounce
-                DelayNmSec(DEBOUNCE_DELAY);
-
-            if(Flags.current_state == STATE_STOPPED)
-                Flags.current_state = STATE_STARTING;
-            else
-                Flags.current_state = STATE_STOPPING;
-        }
-#elif defined MCHV
+    
+ //   float x1= 0.975;
+ //   float y1= 12125;
+ //   float z;
+    
+    while(1) {
+       
+  //      z = (x1 * y1 + z);
+    
+#if defined CURIOS_DEV
         if(S1)
-		{ //start/stop switch
+        { //start/stop switch
             while(S1) //debounce
                 DelayNmSec(DEBOUNCE_DELAY);
-            
-            if(Flags.current_state == STATE_STOPPED)
+
+            if(Flags.current_state == STATE_STOPPED) 
                 Flags.current_state = STATE_STARTING;
             else
                 Flags.current_state = STATE_STOPPING;
@@ -104,18 +98,11 @@ int32_t main(void)
                 break;
 
             case STATE_STARTED:
-                if(Flags.newCLKW != Flags.CLKW)
-                {
-                    Stop_Motor();
-                    Flags.CLKW = Flags.newCLKW;
-                    DelayNmSec(1000);	//delay for motor to actually stop
-                    Flags.current_state = STATE_STARTING;
-                }
+                // do nothing here
                 break;
 
             case STATE_STOPPED:
-                if(Flags.newCLKW != Flags.CLKW)
-                    Flags.CLKW = Flags.newCLKW;
+                // do nothing here
                 break;
         }
     }
@@ -124,9 +111,9 @@ int32_t main(void)
 
 /*******************************************************************
 Init_Motor()
-	Procedure used to initialize all params for the motor and
+Procedure used to initialize all params for the motor and
 for the AN1160 algorithm.
-	Also rotor alignment is done here.
+Also rotor alignment is done here.
 *******************************************************************/
 void Init_Motor()
 {
@@ -139,7 +126,7 @@ void Init_Motor()
     CCP2TMRbits.TMRL = 0;
     CCP3TMRbits.TMRL = 0;
     
-    //Setting direction CLKW or CCLKW
+    //Setting direction CLKW or CCLKW ( <change at compile time only> )
     if (Flags.CLKW == 1)
     {
         for (i = 0; i < 6; i++)
@@ -191,7 +178,7 @@ void Init_Motor()
 
 /**********************************************************************
 Start_Motor()
-	Procedure for starting the motor according to the implemented
+Procedure for starting the motor according to the implemented
 startup ramp. After the ramp, PI loop training will begin.
 **********************************************************************/
 void Start_Motor()
@@ -225,12 +212,12 @@ void Start_Motor()
 
 /*********************************************************************
 Stop_Motor()
-	Procedure for stopping the motor from running and resetting
+Procedure for stopping the motor from running and resetting
 critical variables.
 **********************************************************************/
 void Stop_Motor()
 {
-    CCP1CON2 = (CCP1CON2 & 0XC0FFFFFF) | 0x00000000;         // override PWM pins low
+    CCP1CON2 = (CCP1CON2 & 0XC0FFFFFF) | 0x00000000;   // override PWM pins low
     adcBackEMFFilter = 0;
     PIticks = 0;
 
@@ -250,13 +237,14 @@ void Stop_Motor()
 
 /******************************************************************************
 ADC Interrupt Service Routine()
-	Actual implementation of the BLDC sensorless BEMF zero-crossing
+Actual implementation of the BLDC sensor-less BEMF zero-crossing
 detection algorithm. In this routine, the ADC will read the corresponding
 phase, apply the majority detection filter, and find the zero-crossing point.
-	Here we also read the potentiometer and execute the control loop for
-the algoritm ( PI or Open loop ).
+Here we also read the potentiometer and execute the control loop for
+the algorithm ( PI or Open loop ).
 ******************************************************************************/
-void __attribute__ ((vector(_ADC_VECTOR), interrupt(IPL7SOFT), micromips)) _ADC1Interrupt(void)
+//void __attribute__ ((vector(_ADC_VECTOR), interrupt(IPL7SOFT), micromips)) _ADC1Interrupt(void)
+void __ISR(_ADC_VECTOR, IPL7SOFT) ADC1Interrupt(void)
 {
     if(Flags.PreCommutationState == 0)
     {
@@ -281,9 +269,9 @@ void __attribute__ ((vector(_ADC_VECTOR), interrupt(IPL7SOFT), micromips)) _ADC1
         {
 			ComparatorOutputs = 0;						// Precondition all comparator bits as zeros
 			if(MotorPhaseA > MotorNeutralVoltage)
-				ComparatorOutputs += 1;					// Set bit 0 when Phase A is higher than Neutural
+				ComparatorOutputs += 1;					// Set bit 0 when Phase A is higher than Neutral
 			if(MotorPhaseB > MotorNeutralVoltage)
-				ComparatorOutputs += 2;					// Set bit 1 when Phase B is higher than Neutural
+				ComparatorOutputs += 2;					// Set bit 1 when Phase B is higher than Neutral
 			if(MotorPhaseC > MotorNeutralVoltage)
 				ComparatorOutputs += 4;					// Set bit 2 when Phase C is higher than Neutral
 
@@ -308,7 +296,7 @@ void __attribute__ ((vector(_ADC_VECTOR), interrupt(IPL7SOFT), micromips)) _ADC1
 
 				// Calculate the time proportional to the 60 electrical degrees
     			CCP3CON1bits.ON = 0;  // Stop SCCP3 Timer 
-    			SCCP3Average = ((SCCP3Average+ SCCP3Value + 2*CCP3TMRbits.TMRL)>>2);
+    			SCCP3Average = ((SCCP3Average + SCCP3Value + 2*CCP3TMRbits.TMRL)>>2);
     			SCCP3Value = CCP3TMRbits.TMRL;
     			CCP3TMRbits.TMRL = 0;
     			CCP3CON1bits.ON = 1;  // Start SCCP3 Timer
@@ -317,7 +305,7 @@ void __attribute__ ((vector(_ADC_VECTOR), interrupt(IPL7SOFT), micromips)) _ADC1
 
     			// Calculate the time proportional to the 30 electrical degrees
     			// Load the SCCP2 with  the SCCP3 counts proportional to 30 deg minus the PHASE ADV angle delay
-    			SCCP2Value = (((SCCP3Average)>>1)+PhaseAdvanceTicks);
+    			SCCP2Value = (((SCCP3Average)>>1) + PhaseAdvanceTicks);
 
     			if(SCCP2Value>1)
         			CCP2PRbits.PRL = SCCP2Value;
@@ -347,7 +335,7 @@ void __attribute__ ((vector(_ADC_VECTOR), interrupt(IPL7SOFT), micromips)) _ADC1
         {
             if(Flags.PotRead == 0)
             {
-				AD1CHSbits.CH0SA = 8;		//Select Potentiometer on AN8
+				AD1CHSbits.CH0SA = 11;		//Select Potentiometer on AN11
 				Flags.PotRead = 1;          //Set potentiometer read flag
 			}
             else
@@ -366,7 +354,7 @@ void __attribute__ ((vector(_ADC_VECTOR), interrupt(IPL7SOFT), micromips)) _ADC1
 
 /**********************************************************************
 MCCP Interrupt Service Routine()
-	Occurs every 50 us
+	Occurs every 50 us (PWM period)
 	Used to increment delay_counter ( for DelayNmSec )
 	detects stalling
 **********************************************************************/
@@ -381,7 +369,6 @@ void __attribute__ ((vector(_CCP1_VECTOR), interrupt(IPL3SOFT), micromips)) _CCP
     }
     IFS0bits.CCP1IF = 0;	//clear MCCP Interrupt Flag
 }
-
 
 /**********************************************************************
 SCCP2 Interrupt Service Routine()
@@ -405,4 +392,3 @@ void __attribute__ ((vector(_CCT2_VECTOR), interrupt(IPL5SOFT), micromips)) _CCT
     CCP2CON1bits.ON = 0;            //Stop SCCP2
     CCP2TMRbits.TMRL = 0;
 }
-

@@ -3,7 +3,7 @@
  * this software and any derivatives exclusively with Microchip products.
  *
  * This software and any accompanying information is for suggestion only.
- * It does not modify Microchip's standard warranty for its products.
+ * It does not modify Microchips standard warranty for its products.
  * You agree that you are solely responsible for testing the software and
  * determining its suitability.  Microchip has no obligation to modify,
  * test, certify, or support the software.
@@ -39,17 +39,17 @@
 #include <xc.h>
 #include <stdint.h>
 
-/* MCLV2 or MCHV2 development board can be selected based on the requirement.
+/* CURIOSITY development board can be selected based on the requirement.
  * At any time, only one should be defined.
  * Based on the selection the recommended configurations will be enabled */
 
-#define MCLV
-//#define MCHV
+#define CURIOS_DEV      1
+#define POT 11          // AN channel for pot 
 
 #define FCY 24000000    //Internal 8MHz clock
 #define FPWM 20000		//20,000 Hz PWM
 
-//##################### SPEED CONTROLLER. Choose only one of the two ############################
+// ####### SPEED CONTROLLER. Choose only one of the two #######################
 
 //#define OPEN_LOOP_CONTROL			//Openloop Control
 #define PI_CLOSED_LOOP_CONTROL		//Closedloop Control
@@ -57,7 +57,7 @@
 #define PHASE_ADVANCE_DEGREES	0		//degrees for phase advancing
 
 //########### Motor Control Definitions #################
-#if defined MCLV    // MCLV - Hurst Motor (DMB0224C10002)
+#if defined CURIOS_DEV  
     #define STARTUP_DUTY            800     //sets the starting motor speed in forced commutation mode; increase the value for a lower speed
     #define STARTUP_RPM             1000	//final RPM after startup. this becomes the minimum RPM#define MIN_RPM 
     #define MIN_RPM                 750     // motor RPM at MIN_MOTOR_SPEED_REF
@@ -77,43 +77,18 @@
     #define RPM_PWM_FACTOR (uint16_t)(32768 * ((float)MAX_MOTOR_SPEED_REF / (float)MAX_RPM))	//PWM Duty cycle = RPM_PWM_FACTOR * Speed_in_RPM
 
     #define BEMF_VDDMAX             465
-    /*	on MCLV:
+    /*	on CURIOS_DEV:
         R10/(R10+R14) * DC Voltage / 3.3 V * 1024
         2K/32K * 24 / 3.3 * 1024 = 465 
     */
-#elif defined MCHV      //MCHV - High Voltage PMSM Motor (Beijing Eletechnic 80-252140-220)
-    #define STARTUP_DUTY            700     //sets the starting motor speed in forced commutation mode; increase the value for a lower speed
-    #define STARTUP_RPM             1000
-    #define MIN_RPM                 750     // motor RPM at MIN_MOTOR_SPEED_REF
-    #define MAX_RPM                 3600    // motor RPM at MAX_MOTOR_SPEED_REF
-    #define POLEPAIRS               2       // Number of pole pairs of the motor
-
-    #define RAMPDELAY_START			40	   //in ms;	the starting sector comutation period
-    #define RAMPDELAY_MIN			4	   //in ms;	minimum period for startup ramp; when reaching this value, it will start looking for BEMF
-
-    #define BLANKING_COUNT          40       // Blanking count expressed in PWM periods used to avoid false zero-crossing detection after commutating motor
-    #define BEMF_STALL_LIMIT        5000     // If no BEMF signal is detected for (BEMF_STALL_LIMIT*BLANKING_COUNT * 50us) then it is assumed the rotor is stalled
-
-    #define MAX_MOTOR_SPEED_REF     3600    // corresponds to MAX_RPM
-    #define MIN_MOTOR_SPEED_REF     700     // decrease or increase this value to set the minimum motor speed
-                                        // The minimum motor speed in closed loop is MAX_RPM*MIN_MOTOR_SPEED_REF/MAX_MOTOR_SPEED_REF
-
-    #define RPM_PWM_FACTOR (uint16_t)(32768 * ((float)MAX_MOTOR_SPEED_REF / (float)MAX_RPM))	//PWM Duty cycle = RPM_PWM_FACTOR * Speed_in_RPM
-
-    #define BEMF_VDDMAX             700
-    /*	on MCHV:
-    R96/(R80+R88+R96) * DC Voltage / 3.3V * 1024
-    2.2K/302K * 310 / 3.3V * 1024 = 700
-    */
 #endif
 
-/* Switch configuration based on the board selected*/
-#if defined MCLV
-    #define S3	!PORTAbits.RA4	//S3 button
-    #define S2	!PORTCbits.RC9	//S2 button
-#elif defined MCHV
-    #define S1	!PORTBbits.RB4	//S1 button
+/* Switch configuration based on the board selected */
+#if defined CURIOS_DEV
+    #define S1	!PORTBbits.RB7	    //S1 button
+    #define S2	!PORTBbits.RB13	    //S2 button (direction))
 #endif
+    #define LED2 PortCbits.RC9      // LED #2
 
 /* ####################  PI loop constants ############################## */
 #define PI_P_TERM	2000
@@ -123,7 +98,7 @@
 #define PWM_100us_FACTOR            (FPWM/10000)
 
 /*******************  Derived Definitions  - Do not change*******************/
-#define PI_TICKS        80                          // Speed Controller frequency ->  80 ADC periods
+#define PI_TICKS        80                        // Speed Controller frequency ->  80 ADC periods
 #define MAX_DUTY_CYCLE  (int32_t)((FCY/FPWM)-1)   // 100% duty cycle
 
 /* SCCP3 Timer measures the motor speed by measuring the time the rotor takes 
@@ -159,9 +134,10 @@
 } TFlags;
 extern TFlags Flags;
 
-//############## Clockwise and Counter-Clockwise rotation constants, majority detection filter, etc ####################
+/* ## Clockwise and Counter-Clockwise rotation constants, and
+      majority detection filter, etc                          */
 
-/*override values for each sector*/
+/* override values for each sector */
 extern const uint32_t PWM_STATE_CLKW[6];
 extern uint32_t PWM_STATE[6];
 
@@ -223,7 +199,7 @@ void DelayNmSec(uint32_t N);	//delays N milLi seconds. MCCP Timer Based blocking
 
 //motor control functions. defined here, implemented in main.c
 void Init_Motor(void);		//just initialize motor and PI
-void Start_Motor(void);		//sequence to attempt to forcely start the motor
+void Start_Motor(void);		//sequence to attempt to force start of the motor
 void Stop_Motor(void);		//stops motor
 
 #endif

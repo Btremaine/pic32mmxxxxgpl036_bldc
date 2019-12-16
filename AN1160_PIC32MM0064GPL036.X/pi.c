@@ -3,7 +3,7 @@
  * this software and any derivatives exclusively with Microchip products.
  *
  * This software and any accompanying information is for suggestion only.
- * It does not modify Microchip's standard warranty for its products.
+ * It does not modify Microchips standard warranty for its products.
  * You agree that you are solely responsible for testing the software and
  * determining its suitability.  Microchip has no obligation to modify,
  * test, certify, or support the software.
@@ -30,6 +30,12 @@
  * MICROCHIP PROVIDES THIS SOFTWARE CONDITIONALLY UPON YOUR ACCEPTANCE OF
  * THESE TERMS.
  *
+ * 12/3/2019 Prysm Inc. Brian Tremaine
+ * Code base AN1160_PIC32MM0064GPL_MCLV_MCLV taken as starting point for
+ * Java project (Gen3).
+ * Rebuild for the PIC32MM Curiosity Development Board.
+ * Add dual loop PI + phase detector
+ * 
 * *****************************************************************************/
 
 #include "pi.h"
@@ -104,4 +110,58 @@ void CalcPI( tPIParm *pParm)
 
     //Sum = Sum + U = Sum + Ki * Err - Kc * Exc
     pParm->qdSum = pParm->qdSum + U;
+}
+
+/* phase_det - function to calculate phase error */
+void phase_det( )
+{
+    
+    
+}
+
+/* pi_outer */
+void pi_outer( )
+{
+  // PI for outer loop, result is Fref   
+    
+}
+
+/* fg_det */
+void fg_det( )
+{
+  /*  frequency error detector between motor Fg and outer loop Fref
+  */
+    
+    
+}
+
+/* pi_inner */
+void pi_inner( )
+{
+ // PI for inner loop, result is correction error to pwm
+    
+}
+
+/* update pwm value*/
+update_pwm()
+{
+    /* update pwm value to drive motor */
+    
+}
+
+/* ISRs for servo PI*/
+
+/* Fref input edge*/
+Fref_ISR()
+{
+  // Fref rising edge, set PU and call phase_det()  
+}
+
+/* Fg input edge */
+Fg_ISR()
+{
+    // Fg rising edge, increment Ffb
+    // compute average Fg
+    // if Ffb rising edge set PD and call phase_det())
+    
 }
