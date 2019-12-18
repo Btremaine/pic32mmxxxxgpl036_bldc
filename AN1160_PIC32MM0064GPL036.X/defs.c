@@ -52,7 +52,11 @@ uint32_t MotorPhaseBState[6];
 uint32_t MotorPhaseCState[6];
 
 // define ADC channels #'s used for reading U, V & W as well as neutral
-const uint16_t ADC_CHANNEL_CLKW[6] = {0x0003,0x0002,0x0004,0x0003,0x0002,0x0004};
+#if 1
+    const uint16_t ADC_CHANNEL_CLKW[6] = {0x0003,0x0002,0x0004,0x0003,0x0002,0x0004};
+#else
+const uint16_t ADC_CHANNEL_CLKW[6] = {0x000b,0x000b,0x000b,0x000b,0x000b,0x000b};  // debug adc
+#endif
 uint16_t ADC_CHANNEL[6];
 
 const uint16_t ADC_MASK_CLKW[6]	=   {0x0002,0x0001,0x0004,0x0002,0x0001,0x0004};
@@ -92,7 +96,8 @@ volatile int32_t delay_counter;
 
 uint32_t CurrentSpeed, DesiredSpeed, DesiredRPM, CurrentDuty, DesiredDuty; 	//speed definitions
 
-tPIParm PIDStructure;
+tPIParm PIDStructureVel;
+tPIParm PIDStructurePha;
 
 /***************************************************
  SpeedPILoopController
@@ -107,12 +112,12 @@ void SpeedPILoopController(void)
     // and then multiplied by the number of sector
     // required to complete 1 electrical RPS
     CurrentSpeed = (uint16_t)(SPEEDMULT/SCCP3Average);     
-    PIDStructure.qInRef = DesiredSpeed;
-    PIDStructure.qInMeas = CurrentSpeed;
+    PIDStructureVel.InRef = DesiredSpeed;
+    PIDStructureVel.InMeas = CurrentSpeed;
 
-    CalcPI(&PIDStructure);
+    CalcPI(&PIDStructureVel);
 
-    CurrentSpeed =  PIDStructure.qOut;      //set PID output
+    CurrentSpeed =  PIDStructureVel.Out;   //set PID output
 
     //Assigning new duty cycle to the PWM channels
     CCP1RBbits.CMPB = CurrentSpeed;

@@ -1,3 +1,4 @@
+
 /* *********************************************************************
  * (c) 2017 Microchip Technology Inc. and its subsidiaries. You may use
  * this software and any derivatives exclusively with Microchip products.
@@ -32,9 +33,13 @@
  *
 * *****************************************************************************/
 
+#include <proc/p32mm0064gpl036.h>
+
 #include "periph.h"
 
 // PIC32MM0064GPL036 Configuration Bit Settings
+// for curiosity board use internal 8MHz clock scaled up 4x to 24MHz
+// product will use primary osc 8MHz scaled up 4x to 24MHz.
 // FDEVOPT
 #pragma config SOSCHP = OFF             // Secondary Oscillator High Power Enable bit (SOSC oprerates in normal power mode.)
 
@@ -57,8 +62,8 @@
 
 // FOSCSEL
 #pragma config FNOSC = PLL
-#pragma config PLLSRC = FRC             // System PLL Input Clock Selection bit (FRC oscillator is selected as PLL reference input on device reset)
-#pragma config SOSCEN = ON
+#pragma config PLLSRC = FRC             // System PLL Input Clock Selection bit (FRC oscillator internal fast oscillator)
+#pragma config SOSCEN = ON              // Secondary osc enable
 #pragma config IESO = ON                // Two Speed Startup Enable bit (Two speed startup is enabled)
 #pragma config POSCMOD = OFF            // Primary Oscillator Selection bit (Primary oscillator is disabled)
 #pragma config OSCIOFNC = OFF           // System Clock on CLKO Pin Enable bit (OSCO pin operates as a normal I/O)
@@ -87,9 +92,9 @@ void Init_Peripheral(void)
     SYSKEY = 0xAA996655;
     SYSKEY = 0x556699AA;
     OSCCONbits.FRCDIV = 0;
-    OSCCONbits.COSC = 0;
-    SPLLCONbits.PLLODIV = 0;
-    SPLLCONbits.PLLMULT = 1;
+    OSCCONbits.COSC = 0;      // internal fast RC oscillator
+    SPLLCONbits.PLLODIV = 0;  // div 1
+    SPLLCONbits.PLLMULT = 1;  // x3
     SPLLCONbits.PLLICLK = 1;
     REFO1CONbits.ON = 1;     // debug, output sys clock
     REFO1CONbits.OE = 1;
@@ -142,15 +147,22 @@ void Init_ADC(void)
 {
     // clear all ADC's
     AD1CON1 = 0;
-    AD1CON2 = 0;
+    AD1CON2 = 0;               // VCFG RefH: AVdd, RefL: AVss 
     AD1CON3 = 0;
     AD1CON5 = 0;
 
-    AD1CON1 = 0x0064;          // format int-16bit, Timer1, 10-bit, Auto-start
-    AD1CHSbits.CH0SA = POT;
-    AD1CON3 = 0x0203;          // conversion clock and auto-sample time
-    AD1CON2 = 0x0000;
-    AD1CON5 = 0x0000;
+    AD1CON1bits.SIDL = 0;      // continues operation in idle mode
+    AD1CON1bits.FORM = 0;      // int 16bit format
+    AD1CON1bits.SSRC = 6;      // timer1 ends sampling starts conversion
+    AD1CON1bits.MODE12 = 0;    // 10-bit mode
+    AD1CON1bits.ASAM = 1;      // automatic sampling
+    
+    AD1CHSbits.CH0SA = POT;    // temporary channel setting for now
+    AD1CON3bits.ADCS = 3;      // conversion 3*Tsrc
+    AD1CON3bits.SAMC = 2;      // sample 2*Tsrc
+    AD1CON3bits.EXTSAM = 0;    // stop sampling when SAMP=0
+    AD1CON3bits.ADRC = 0;      // clock derived from peripheral bus
+    
     AD1CON1bits.DONE = 0;
     
     IPC3bits.AD1IP = 7;         // Set ADC interrupt priority
@@ -165,7 +177,7 @@ void Init_MCCP(void)
     CCP1CON1bits.SIDL = 1;          // MCCP time base halted in CPU IDLE mode
 
     // Set MCCP operating mode
-    CCP1CON1bits.CCSEL = 0;         // Set MCCP operating mode (OC mode)
+    CCP1CON1bits.CCSEL = 0;         // Set MCCP operating mode (OC/timer mode)
     CCP1CON1bits.MOD = 5;           // Set mode (Buffered Dual-Compare/PWM mode)
 
     //Configure MCCP Timebase
@@ -175,9 +187,9 @@ void Init_MCCP(void)
     CCP1CON1bits.TMRPS = 0b00;      // Set the clock pre-scaler (1:1)
     CCP1CON1bits.TRIGEN = 0;        // Set Sync/Triggered mode (Synchronous)
     CCP1CON1bits.SYNC = 0b00000;    // Select Sync/Trigger source (Self-sync)
-    CCP1CON2 = 0x0000;
-
+    
     //Configure MCCP output for PWM signal
+    CCP1CON2 = 0x0000;
     CCP1CON2bits.OCAEN = 0;         // Control desired output signals (OC1A)
     CCP1CON2bits.OCBEN = 0;         // Control desired output signals (OC1B)
     CCP1CON2bits.OCCEN = 0;         // Control desired output signals (OC1C)
@@ -186,9 +198,10 @@ void Init_MCCP(void)
     CCP1CON2bits.OCFEN = 0;         // Control desired output signals (OC1F)
     CCP1CON2bits.OENSYNC = 1;
 
-    CCP1CON3bits.OUTM = 0;          // Set advanced output modes (Standard output)
-    CCP1CON3bits.POLACE = 0;        //Configure output polarity (Active High)
-    CCP1CON3bits.DT = 0;
+    CCP1CON3bits.OUTM = 0;          // Steerable Single output mode)
+    CCP1CON3bits.POLACE = 0;        // Configure output polarity (Active High)
+    CCP1CON3bits.DT = 0;            // dead-time logic disabled
+    
     CCP1TMRbits.TMRL = 0x0000;      //Initialize timer prior to enable module.
     CCP1RAbits.CMPA = 0;
     CCP1RBbits.CMPB = 10;           //Small Duty Cycle to enable MCCP Interrupt Run for Delay function
@@ -206,14 +219,14 @@ void Init_Timers(void)
 {
     // ======================== // Timer 1
     TMR1 = 0;                   // Resetting timer 1
-    PR1 = ((FCY/FPWM)/7 - 1);   // // Frequency at which Timer1 triggers ADC. About 6 ADCs every PWM.
-    T1CONbits.TCS = 0;
-    // ======================== // ?
-    CCP2CON1bits.CCSEL = 0;     // Set SCCP2 operating mode
+    PR1 = ((FCY/FPWM)/7 - 1);   // Frequency at which Timer1 triggers ADC. About 6 ADCs every PWM.
+    T1CONbits.TCS = 0;          // internal peripheral clock
+    // ======================== // SCCP2:
+    CCP2CON1bits.CCSEL = 0;     // Set SCCP2 operating mode, Output Compare/PWM or Timer mode 
     CCP2CON1bits.MOD = 0;       // Set mode to 16/32 bit timer mode
     CCP2CON1bits.T32 = 0;       // Set timebase width (16-bit)
     CCP2CON1bits.TMRSYNC = 0;   // Set timebase synchronization (Synchronized)
-    CCP2CON1bits.CLKSEL = 0b000;// Set the clock source (Tcy)
+    CCP2CON1bits.CLKSEL = 0b000;// Set the clock source (Tcy) Fsys
     CCP2CON1bits.TMRPS = 0b11;  // Set the clock pre-scaler (1:64)
     CCP2CON1bits.TRIGEN = 0;    // Set Sync/Triggered mode (Synchronous)
     CCP2CON1bits.SYNC = 0b00000;// Timer is in the Free-Running mode and rolls over at FFFFh (Timer Period register is ignored)
@@ -221,7 +234,7 @@ void Init_Timers(void)
     CCP2TMRbits.TMRL = 0;
     CCP2PRbits.PRH = 0;
     CCP2PRbits.PRL = 10;        // Configure timebase period. This is always changed in pre-commutation state.
-    // ========================= // ?
+    // ========================= // SCCP3:
     CCP3CON1bits.CCSEL = 0;     // Set SCCP3 operating mode
     CCP3CON1bits.MOD = 0b0000;  // Set mode to 16/32 bit timer mode
     CCP3CON1bits.T32 = 0;       // Set timebase width (16-bit)

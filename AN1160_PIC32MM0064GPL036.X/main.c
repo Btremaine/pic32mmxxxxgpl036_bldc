@@ -56,14 +56,8 @@ int32_t main(void)
     DesiredRPM = STARTUP_RPM;      
     Flags.current_state = STATE_STOPPED;
     
- //   float x1= 0.975;
- //   float y1= 12125;
- //   float z;
-    
     while(1) {
-       
-  //      z = (x1 * y1 + z);
-    
+          
 #if defined CURIOS_DEV
         if(S1)
         { //start/stop switch
@@ -160,7 +154,8 @@ void Init_Motor()
 
     stallCount = 0;
 
-    InitPI(&PIDStructure,SpeedControl_P,SpeedControl_I,PI_ANTI_WINDUP,MAX_MOTOR_SPEED_REF,MIN_MOTOR_SPEED_REF,MIN_MOTOR_SPEED_REF);
+    InitPI(&PIDStructureVel,SpeedControl_P,SpeedControl_I,PI_ANTI_WINDUP,MAX_MOTOR_SPEED_REF,MIN_MOTOR_SPEED_REF,MIN_MOTOR_SPEED_REF);
+    InitPI(&PIDStructurePha,SpeedControl_P,SpeedControl_I,PI_ANTI_WINDUP,MAX_MOTOR_SPEED_REF,MIN_MOTOR_SPEED_REF,MIN_MOTOR_SPEED_REF);
 
     ADCCommState = 5;	//Always start with sector 6 forced
     RampDelay = RAMPDELAY_START;	//startup initial delay. also the delay used to hold the rotor for the first sector
@@ -228,8 +223,7 @@ void Stop_Motor()
 
     T1CONbits.TON = 0;      // Stop TIMER1
     CCP3CON1bits.ON = 0;    // Stop SCCP3 Timer
-    CCP2CON1bits.ON = 0;	// Stop SCCP2 Timer
-    
+    CCP2CON1bits.ON = 0;	// Stop SCCP2 Timer 
     TMR1 = 0;
     CCP2TMRbits.TMRL = 0;
     CCP3TMRbits.TMRL = 0;
@@ -245,20 +239,21 @@ the algorithm ( PI or Open loop ).
 ******************************************************************************/
 //void __attribute__ ((vector(_ADC_VECTOR), interrupt(IPL7SOFT), micromips)) _ADC1Interrupt(void)
 void __ISR(_ADC_VECTOR, IPL7SOFT) ADC1Interrupt(void)
-{
+{  
     if(Flags.PreCommutationState == 0)
     {
         MotorPhaseA = MotorPhaseAState[ADCCommState];
 		MotorPhaseB = MotorPhaseBState[ADCCommState];
 		MotorPhaseC = MotorPhaseCState[ADCCommState];
             
+        LATCbits.LATC9 = ~LATCbits.LATC9;  // test-point for ADC 
+        //LATCbits.LATC9 = ~LATCbits.LATC9;
+        
         if(MotorPhaseA == 1)
             MotorPhaseA = ADC1BUF0;
-
-        if(MotorPhaseB == 1)
+        else if(MotorPhaseB == 1)
             MotorPhaseB = ADC1BUF0;
-
-        if(MotorPhaseC == 1)
+        else if(MotorPhaseC == 1)
             MotorPhaseC = ADC1BUF0;
          
 		MotorNeutralVoltage = (MotorPhaseA + MotorPhaseB + MotorPhaseC) / 3;
@@ -317,7 +312,9 @@ void __ISR(_ADC_VECTOR, IPL7SOFT) ADC1Interrupt(void)
             else
                 ++stallCount;	//if a BEMF zero crossing was not detected increment the stall counter
         }
-
+        
+        LATCbits.LATC9 = ~LATCbits.LATC9; // test
+        
         //Call the speed controller at a fixed frequency, which is (PI_TICKS*50us)
         if(++PIticks >= PI_TICKS)
         {
@@ -335,7 +332,7 @@ void __ISR(_ADC_VECTOR, IPL7SOFT) ADC1Interrupt(void)
         {
             if(Flags.PotRead == 0)
             {
-				AD1CHSbits.CH0SA = 11;		//Select Potentiometer on AN11
+				AD1CHSbits.CH0SA = POT;		//Select Potentiometer on AN11
 				Flags.PotRead = 1;          //Set potentiometer read flag
 			}
             else
@@ -354,15 +351,17 @@ void __ISR(_ADC_VECTOR, IPL7SOFT) ADC1Interrupt(void)
 
 /**********************************************************************
 MCCP Interrupt Service Routine()
-	Occurs every 50 us (PWM period)
+	Occurs every PWM period, (~50us)
 	Used to increment delay_counter ( for DelayNmSec )
 	detects stalling
+ * Note: same as PWM interrupt in dsPIC33 demo code
 **********************************************************************/
 void __attribute__ ((vector(_CCP1_VECTOR), interrupt(IPL3SOFT), micromips)) _CCP1Interrupt(void)
 {
     delay_counter++;
     //rotor stall detection
-    if (stallCount > BEMF_STALL_LIMIT && Flags.current_state == STATE_STARTED)
+    if (stallCount > BEMF_STALL_LIMIT && Flags.current_state == STATE_STARTED
+            )
     {
         Flags.current_state = STATE_FAULT;      //go to FAULT state and restart the motor without pushing the button
         stallCount = 0;     //clear the stall counter
@@ -374,6 +373,7 @@ void __attribute__ ((vector(_CCP1_VECTOR), interrupt(IPL3SOFT), micromips)) _CCP
 SCCP2 Interrupt Service Routine()
 	- used to switch (commute) the current driving sector of the motor
 	- ends PreCommutationState
+ * Note: same a Timer1 Interrupt in dsPIC33 demo code
 **********************************************************************/
 void __attribute__ ((vector(_CCT2_VECTOR), interrupt(IPL5SOFT), micromips)) _CCT2Interrupt(void)
 {

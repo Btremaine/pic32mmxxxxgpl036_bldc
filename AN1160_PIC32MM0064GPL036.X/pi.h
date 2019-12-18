@@ -38,15 +38,15 @@
 //------------------  C API for PI routines ---------------------
 
 typedef struct {
-    int32_t  qdSum;		//Integrator sum
-    int16_t   qKp;      //Proportional Gain
-    int16_t   qKi;      //Integral Gain
-    int16_t   qKc;      //Anti-windup Gain
-    int16_t   qOutMax;	//PI Output maximum limit
-    int16_t   qOutMin;	//PI Output minimum limit
-    int16_t   qInRef; 	//Reference
-    int16_t   qInMeas;	//Measurement
-    int16_t   qOut;     //PI Output
+    int32_t   Sum;		//Integrator sum
+    int16_t   Kp;      //Proportional Gain
+    int16_t   Ki;      //Integral Gain
+    int16_t   Kc;      //Anti-windup Gain
+    int16_t   OutMax;	//PI Output maximum limit
+    int16_t   OutMin;	//PI Output minimum limit
+    int16_t   InRef; 	//Reference
+    int16_t   InMeas;	//Measurement
+    int16_t   Out;     //PI Output
     } tPIParm;
 
 /************************************************************************

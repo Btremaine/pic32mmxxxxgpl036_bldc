@@ -46,8 +46,8 @@
 #define CURIOS_DEV      1
 #define POT 11          // AN channel for pot 
 
-#define FCY 24000000    //Internal 8MHz clock
-#define FPWM 20000		//20,000 Hz PWM
+#define FCY 24000000    //Internal 8MHz clock x 4
+#define FPWM 25000		//25,000 Hz PWM
 
 // ####### SPEED CONTROLLER. Choose only one of the two #######################
 
@@ -61,8 +61,8 @@
     #define STARTUP_DUTY            800     //sets the starting motor speed in forced commutation mode; increase the value for a lower speed
     #define STARTUP_RPM             1000	//final RPM after startup. this becomes the minimum RPM#define MIN_RPM 
     #define MIN_RPM                 750     // motor RPM at MIN_MOTOR_SPEED_REF
-    #define MAX_RPM                 3100    // motor RPM at MAX_MOTOR_SPEED_REF
-    #define POLEPAIRS               5       // Number of pole pairs of the motor
+    #define MAX_RPM                 2400    // motor RPM at MAX_MOTOR_SPEED_REF
+    #define POLEPAIRS               6       // Number of pole pairs of the motor
 
     #define RAMPDELAY_START         40      //in ms; the starting sector comutation period
     #define RAMPDELAY_MIN           4       //in ms; minimum period for startup ramp; when reaching this value, it will start looking for BEMF
@@ -70,13 +70,13 @@
     #define BLANKING_COUNT          40       // Blanking count expressed in PWM periods used to avoid false zero-crossing detection after commutating motor
     #define BEMF_STALL_LIMIT        5000     // If no BEMF signal is detected for (BEMF_STALL_LIMIT*BLANKING_COUNT * 50us) then it is assumed the rotor is stalled
 
-    #define MAX_MOTOR_SPEED_REF     1199    // corresponds to MAX_RPM
-    #define MIN_MOTOR_SPEED_REF     500     // decrease or increase this value to set the minimum motor speed
+    #define MAX_MOTOR_SPEED_REF     2000    // corresponds to MAX_RPM
+    #define MIN_MOTOR_SPEED_REF     400     // decrease or increase this value to set the minimum motor speed
                                             // The minimum motor speed in closed loop is MAX_RPM*MIN_MOTOR_SPEED_REF/MAX_MOTOR_SPEED_REF
 
     #define RPM_PWM_FACTOR (uint16_t)(32768 * ((float)MAX_MOTOR_SPEED_REF / (float)MAX_RPM))	//PWM Duty cycle = RPM_PWM_FACTOR * Speed_in_RPM
 
-    #define BEMF_VDDMAX             465
+    #define BEMF_VDDMAX             400          
     /*	on CURIOS_DEV:
         R10/(R10+R14) * DC Voltage / 3.3 V * 1024
         2K/32K * 24 / 3.3 * 1024 = 465 
@@ -189,7 +189,8 @@ extern uint32_t CurrentSpeed, DesiredSpeed, DesiredRPM, CurrentDuty, DesiredDuty
 //PI Controller definitions
 extern uint32_t SpeedControl_P;         // The P term for the PI speed control loop. Modify in defs.c
 extern uint32_t SpeedControl_I;         // The I term for the PI speed control loop. Modify in defs.c
-extern tPIParm PIDStructure;            // PID Structure
+extern tPIParm PIDStructureVel;         // PID Structure inner velocity loop
+extern tPIParm PIDStructurePha;         // PID Structure outer phase loop
 
 void SpeedPILoopController(void);		// PI Loop Controller
 void OpenLoopController(void);			// Open Loop Controller

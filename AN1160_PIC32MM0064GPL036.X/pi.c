@@ -52,19 +52,21 @@ InitPI - function to init the PI Controller
 ************************************************************************/
 void InitPI(tPIParm *pParm,int16_t Kp,int16_t Ki,int16_t Kc,int16_t max,int16_t min,int16_t out)
 {
-    pParm->qdSum = 0;
-    pParm->qKp = Kp;
-    pParm->qKi = Ki;
-    pParm->qKc = Kc;
-    pParm->qOutMax = max;
-    pParm->qOutMin = min;
-    pParm->qOut = out;
+    pParm->Sum = 0;
+    pParm->Kp = Kp;
+    pParm->Ki = Ki;
+    pParm->Kc = Kc;
+    pParm->OutMax = max;
+    pParm->OutMin = min;
+    pParm->Out = out;
 
 }
 
 /* CalcPI - function to calculate the output of the PI */
 void CalcPI( tPIParm *pParm)
 {
+    // need to implement Q.N fixed point arithmetic
+    // use this PI for inner & outer loop compensation.
  /*
 ;    Error  = Reference - Measurement
 ;    U  = Sum + Kp * Error
@@ -82,34 +84,34 @@ void CalcPI( tPIParm *pParm)
     int16_t outTemp;
 
     //Error  = Reference - Measurement
-    currentError = pParm->qInRef - pParm->qInMeas;
+    currentError = pParm->InRef - pParm->InMeas;
     //U  = Sum + Kp * Error
-    U = (currentError*pParm->qKp);    
-    U = U + pParm->qdSum;
+    U = (currentError*pParm->Kp);    
+    U = U + pParm->Sum;
 
 
     //limit the output between the allowed limits
     //pParm->qOut is the PI output
     outTemp = (int32_t)(U>>15);
-    if(outTemp >  pParm->qOutMax)
-        pParm->qOut=  pParm->qOutMax;
-    else if(outTemp < pParm->qOutMin)
-        pParm->qOut =  pParm->qOutMin;
+    if(outTemp >  pParm->OutMax)
+        pParm->Out=  pParm->OutMax;
+    else if(outTemp < pParm->OutMin)
+        pParm->Out =  pParm->OutMin;
     else
-        pParm->qOut = outTemp;
+        pParm->Out = outTemp;
 
     //U = Ki * Err
-    U = (currentError*pParm->qKi);
+    U = (currentError*pParm->Ki);
 
     //compute the difference between the limited and not limited output
     //currentError is used as a temporary variable
-    currentError = outTemp - pParm->qOut;
+    currentError = outTemp - pParm->Out;
 
     //U = U - Kc * Err = Ki * Err - Kc * Exc
-    U -= (currentError*pParm->qKc);
+    U -= (currentError*pParm->Kc);
 
     //Sum = Sum + U = Sum + Ki * Err - Kc * Exc
-    pParm->qdSum = pParm->qdSum + U;
+    pParm->Sum = pParm->Sum + U;
 }
 
 /* phase_det - function to calculate phase error */
