@@ -1,4 +1,4 @@
-/* *********************************************************************
+ /* *********************************************************************
  * (c) 2017 Microchip Technology Inc. and its subsidiaries. You may use
  * this software and any derivatives exclusively with Microchip products.
  *
@@ -51,14 +51,17 @@
 
 // ####### SPEED CONTROLLER. Choose only one of the two #######################
 
-//#define OPEN_LOOP_CONTROL			//Openloop Control
+#if 1
+#define OPEN_LOOP_CONTROL			//Openloop Control
+#else
 #define PI_CLOSED_LOOP_CONTROL		//Closedloop Control
+#endif
 
 #define PHASE_ADVANCE_DEGREES	0		//degrees for phase advancing
 
 //########### Motor Control Definitions #################
 #if defined CURIOS_DEV  
-    #define STARTUP_DUTY            800     //sets the starting motor speed in forced commutation mode; increase the value for a lower speed
+    #define STARTUP_DUTY            240     //sets the starting motor speed in forced commutation mode; Fsys & Fpwm dependent
     #define STARTUP_RPM             1000	//final RPM after startup. this becomes the minimum RPM#define MIN_RPM 
     #define MIN_RPM                 750     // motor RPM at MIN_MOTOR_SPEED_REF
     #define MAX_RPM                 2400    // motor RPM at MAX_MOTOR_SPEED_REF
@@ -67,7 +70,7 @@
     #define RAMPDELAY_START         40      //in ms; the starting sector comutation period
     #define RAMPDELAY_MIN           4       //in ms; minimum period for startup ramp; when reaching this value, it will start looking for BEMF
 
-    #define BLANKING_COUNT          40       // Blanking count expressed in PWM periods used to avoid false zero-crossing detection after commutating motor
+    #define BLANKING_COUNT          2       // Blanking count expressed in PWM periods used to avoid false zero-crossing detection after commutating motor
     #define BEMF_STALL_LIMIT        5000     // If no BEMF signal is detected for (BEMF_STALL_LIMIT*BLANKING_COUNT * 50us) then it is assumed the rotor is stalled
 
     #define MAX_MOTOR_SPEED_REF     2000    // corresponds to MAX_RPM
@@ -95,7 +98,7 @@
 #define PI_I_TERM	200
 #define PI_ANTI_WINDUP  0x7FFF
 
-#define PWM_100us_FACTOR            (FPWM/10000)
+#define PWM_1000us_FACTOR            (FPWM/1000)
 
 /*******************  Derived Definitions  - Do not change*******************/
 #define PI_TICKS        80                        // Speed Controller frequency ->  80 ADC periods
@@ -114,25 +117,28 @@
 //###################### Flags, State Machine, etc #############################
 
 //application flags and state machine
-#define STATE_STOPPED 0		//motor is stopped
-#define STATE_STOPPING 1	//event to tell the motor to stop
-#define STATE_STARTING 2	//event to tell the motor to start, and startup sequence
-#define STATE_STARTED 3		//motor is running
-#define STATE_FAULT 4		//motor fault
+enum {
+   STATE_STOPPED,   //motor is stopped
+   STATE_STOPPING,  //event to tell the motor to stop
+   STATE_STARTING,  //event to tell the motor to start, and startup sequence
+   STATE_STARTED,   //motor is running
+   STATE_FAULT      //motor fault
+} states_t;
 
  typedef struct
 {
     unsigned RunMotor : 1;
-    unsigned Startup :  1;
+    unsigned Startup : 1;
     unsigned CLKW : 1;
-    unsigned newCLKW :  1;
-    unsigned PreCommutationState :  1;
-    unsigned PotRead :  1;
-    unsigned DMCI_Control_SW: 1;
-    unsigned current_state:	  3;
-    unsigned unused :   6;
+    unsigned newCLKW : 1;
+    unsigned PreCommutationState : 1;
+    unsigned PotRead : 1;
+    unsigned DMCI_Control_SW : 1;
+    unsigned current_state : 3;
+    unsigned unused : 1;
 } TFlags;
-extern TFlags Flags;
+
+TFlags volatile Flags;
 
 /* ## Clockwise and Counter-Clockwise rotation constants, and
       majority detection filter, etc                          */
@@ -171,7 +177,7 @@ extern uint16_t Phase_Advance_Degrees;	// stores value for Phase Advance degrees
 extern uint16_t PhaseAdvanceTicks;  	// counter for ticks to be extracted out of Timer2 when commuting to add Phase Advance
 extern uint8_t BlankingCounter;         // blanking counter, for rejecting some values out of the filter
 extern uint32_t PIticks;                // counter for skipping PI calculation
-extern uint32_t stallCount;             // counter for stalling
+extern volatile uint32_t stallCount;             // counter for stalling
 extern uint32_t RampDelay;              // variable used to create the startup ramp delay
 extern volatile int32_t delay_counter;	// used for delays. is incremented automaticalLy in MCPWM interrupt, each 50 us
 extern uint32_t MotorNeutralVoltage;	// Motor Neutral Voltage calculAtion

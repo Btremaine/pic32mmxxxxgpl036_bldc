@@ -137,6 +137,9 @@ void Init_Peripheral(void)
     LATCbits.LATC9 = 0;      // LED2
     TRISCbits.TRISC9 = 0;
     
+    LATBbits.LATB2 = 0;      // debug, RB2
+    TRISBbits.TRISB2 = 0;
+    
 #endif
   
     EnableInterrupts();

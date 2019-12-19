@@ -37,8 +37,6 @@
 uint32_t SpeedControl_P = PI_P_TERM; // The P term for the PI speed control loop
 uint32_t SpeedControl_I = PI_I_TERM; // The I term for the PI speed control loop
 
-TFlags Flags;
-
 const uint32_t PWM_STATE_CLKW[6] =	
             {0x12000000,0x18000000,0x09000000,0x21000000,0x24000000,0x06000000};
 uint32_t PWM_STATE[6];
@@ -78,7 +76,7 @@ uint8_t adcBackEMFFilter;
 uint16_t Phase_Advance_Degrees = PHASE_ADVANCE_DEGREES;
 uint16_t PhaseAdvanceTicks;
 uint8_t BlankingCounter;
-uint32_t stallCount;
+volatile uint32_t stallCount;
 uint32_t RampDelay;
 uint32_t PIticks;
 
@@ -152,10 +150,12 @@ void OpenLoopController(void)
 
 void DelayNmSec(uint32_t N)
 {
+    // busy-waiting delay using PWM ISR, count in milli-seconds
+    // original code was configured as 100us by mistake (?).
     while(N--)
     {
         delay_counter = 0;
-        while(delay_counter < PWM_100us_FACTOR);
+        while(delay_counter < PWM_1000us_FACTOR);
     }
 }
 //end of definitions

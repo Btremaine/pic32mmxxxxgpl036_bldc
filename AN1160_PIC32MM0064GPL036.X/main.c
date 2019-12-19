@@ -48,14 +48,7 @@ int32_t main(void)
     Init_MCCP();    	// MCCP initialization
     Init_ADC();         // Analog-Digital Converter initialization
     Init_Timers();  	// Timer1, SCCP2, SCCP3 initialization
-      
-    //defaults: CLKW rotation, motor stopped
-    Flags.RunMotor = 0;
-    Flags.Startup = 0;
-    Flags.DMCI_Control_SW = 0;		//default potentiometer read
-    DesiredRPM = STARTUP_RPM;      
-    Flags.current_state = STATE_STOPPED;
-    
+         
     while(1) {
           
 #if defined CURIOS_DEV
@@ -73,6 +66,10 @@ int32_t main(void)
         
         switch(Flags.current_state)
         {
+            case STATE_STOPPED:
+                // do nothing here
+                break;
+                
             case STATE_STOPPING:
                 Stop_Motor();
                 Flags.current_state = STATE_STOPPED;
@@ -84,22 +81,20 @@ int32_t main(void)
                 else
                     Start_Motor();
                 break;
+            
+            case STATE_STARTED:
+                // gets changed in ISR
+                break;
 
             case STATE_FAULT:
                 Stop_Motor();
                 DelayNmSec(1000);   //delay for motor to actually stop
                 Flags.current_state = STATE_STARTING;
                 break;
-
-            case STATE_STARTED:
-                // do nothing here
-                break;
-
-            case STATE_STOPPED:
-                // do nothing here
-                break;
-        }
-    }
+            
+        } // end case
+    
+    }  // end while
     return 0;
 }
 
@@ -245,9 +240,9 @@ void __ISR(_ADC_VECTOR, IPL7SOFT) ADC1Interrupt(void)
         MotorPhaseA = MotorPhaseAState[ADCCommState];
 		MotorPhaseB = MotorPhaseBState[ADCCommState];
 		MotorPhaseC = MotorPhaseCState[ADCCommState];
-            
-        LATCbits.LATC9 = ~LATCbits.LATC9;  // test-point for ADC 
-        //LATCbits.LATC9 = ~LATCbits.LATC9;
+        
+        LATCSET = (0b1000000000);  // test: SET LED2 in atomic operation 
+        LATCCLR = (0b1000000000);  // test: CLR LED2 in atomic operation    
         
         if(MotorPhaseA == 1)
             MotorPhaseA = ADC1BUF0;
@@ -257,7 +252,7 @@ void __ISR(_ADC_VECTOR, IPL7SOFT) ADC1Interrupt(void)
             MotorPhaseC = ADC1BUF0;
          
 		MotorNeutralVoltage = (MotorPhaseA + MotorPhaseB + MotorPhaseC) / 3;
-         
+
 		/********************* ADC SAMPLING & BMEF signals comparison ****************/
         BlankingCounter++;
 		if(BlankingCounter > BLANKING_COUNT) 
@@ -313,7 +308,7 @@ void __ISR(_ADC_VECTOR, IPL7SOFT) ADC1Interrupt(void)
                 ++stallCount;	//if a BEMF zero crossing was not detected increment the stall counter
         }
         
-        LATCbits.LATC9 = ~LATCbits.LATC9; // test
+        // LATCbits.LATC9 = ~LATCbits.LATC9; // test
         
         //Call the speed controller at a fixed frequency, which is (PI_TICKS*50us)
         if(++PIticks >= PI_TICKS)
@@ -351,17 +346,18 @@ void __ISR(_ADC_VECTOR, IPL7SOFT) ADC1Interrupt(void)
 
 /**********************************************************************
 MCCP Interrupt Service Routine()
-	Occurs every PWM period, (~50us)
+	Occurs every PWM period, (verified 40us, 25kHz)
 	Used to increment delay_counter ( for DelayNmSec )
 	detects stalling
  * Note: same as PWM interrupt in dsPIC33 demo code
 **********************************************************************/
 void __attribute__ ((vector(_CCP1_VECTOR), interrupt(IPL3SOFT), micromips)) _CCP1Interrupt(void)
 {
+    // LATCINV = (0b1000000000);  // test: toggle LED2 in atomic operation  
+    
     delay_counter++;
     //rotor stall detection
-    if (stallCount > BEMF_STALL_LIMIT && Flags.current_state == STATE_STARTED
-            )
+    if ((stallCount > BEMF_STALL_LIMIT) && (Flags.current_state == STATE_STARTED))
     {
         Flags.current_state = STATE_FAULT;      //go to FAULT state and restart the motor without pushing the button
         stallCount = 0;     //clear the stall counter
