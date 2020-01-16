@@ -37,7 +37,7 @@
 uint32_t SpeedControl_P = PI_P_TERM; // The P term for the PI speed control loop
 uint32_t SpeedControl_I = PI_I_TERM; // The I term for the PI speed control loop
 
-const uint32_t PWM_STATE_CLKW[6] =	
+const uint32_t PWM_STATE_CLKW[6] =	// 1/15/20 verified does step CLKW
             {0x12000000,0x18000000,0x09000000,0x21000000,0x24000000,0x06000000};
 uint32_t PWM_STATE[6];
 
