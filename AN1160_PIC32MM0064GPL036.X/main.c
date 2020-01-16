@@ -4,6 +4,7 @@
  *
  * This software and any accompanying information is for suggestion only.
  * It does not modify Microchips standard warranty for its products.
+ * 
  * You agree that you are solely responsible for testing the software and
  * determining its suitability.  Microchip has no obligation to modify,
  * test, certify, or support the software.
@@ -37,7 +38,7 @@
  *   S1: start/stop switch
  *   S2: not used
  * 
-* *****************************************************************************/
+* *************************************************************************** */
 #include "defs.h"		//defines, function headers, pi, etc
 #include <xc.h>
 #include <sys/attribs.h>
@@ -48,7 +49,30 @@ int32_t main(void)
     Init_MCCP();    	// MCCP initialization
     Init_ADC();         // Analog-Digital Converter initialization
     Init_Timers();  	// Timer1, SCCP2, SCCP3 initialization
-         
+    
+    Flags.CLKW = 0;     // Java runs CCW
+    
+    // ----------this section for debug only -------------------------------
+    while (0) {  // debug RA3 & RB3 do toggle okay 1/15/20
+        LATAINV = (0b0000001000);  // test: RA3 (J3-9,10) : OCM1A
+        LATBINV = (0b0100000000);  // test: RB8 (J2-5,6) : OCM1D
+    }
+      
+    if (0) {     // debug CLKW vs CCW
+        ADCCommState = 5;
+        CCP1RBbits.CMPB = 800;
+        int32_t i = ADCCommState;
+        
+        while(1) {
+           //LATCINV = (0b1000000000);  // test: toggle LED2 in atomic operation 
+           DelayNmSec(1000); 
+           CCP1CON2 = ((CCP1CON2 & 0XC0FFFFFF) | PWM_STATE_CLKW[5-i]);  
+           i--; 
+           if (i<0)
+               i = ADCCommState;
+        }
+    }
+    // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^  
     while(1) {
           
 #if defined CURIOS_DEV
@@ -116,7 +140,7 @@ void Init_Motor()
     CCP3TMRbits.TMRL = 0;
     
     //Setting direction CLKW or CCLKW ( <change at compile time only> )
-    if (Flags.CLKW == 1)
+    if (Flags.CLKW == 0)
     {
         for (i = 0; i < 6; i++)
         {
@@ -155,10 +179,11 @@ void Init_Motor()
     ADCCommState = 5;	//Always start with sector 6 forced
     RampDelay = RAMPDELAY_START;	//startup initial delay. also the delay used to hold the rotor for the first sector
         
-    CCP1CON2 = ((CCP1CON2 & 0XC0FFFFFF) | PWM_STATE[ADCCommState]); //set PWM overdrive according to the PWM channel
+    CCP1CON2 = ((CCP1CON2 & 0XC0FFFFFF) | PWM_STATE[ADCCommState]); //set PWM overdrive according to the PWM channel   
     CurrentSpeed = STARTUP_DUTY;   //Initialize PWM duty cycle value to minimum duty allowed
     CCP1RBbits.CMPB = CurrentSpeed;
-    DelayNmSec(500);
+    
+    DelayNmSec(40);  // ?? what purpose is this delay???  
     
     SCCP3Average = SCCP3Value = CCP3TMRbits.TMRL = SCCP3_MAX;
     SCCP2Value = 0;
@@ -236,25 +261,28 @@ the algorithm ( PI or Open loop ).
 void __ISR(_ADC_VECTOR, IPL7SOFT) ADC1Interrupt(void)
 {  
     if(Flags.PreCommutationState == 0)
-    {
+    {   // this code assumes neutral is predefined with GND==0 & BEMF_VDDMAX
+        // not as accurate but saves processor time.
         MotorPhaseA = MotorPhaseAState[ADCCommState];
 		MotorPhaseB = MotorPhaseBState[ADCCommState];
 		MotorPhaseC = MotorPhaseCState[ADCCommState];
         
+        // trigger t.p. for ADC
         LATCSET = (0b1000000000);  // test: SET LED2 in atomic operation 
+        Nop(); Nop(); Nop(); Nop();
         LATCCLR = (0b1000000000);  // test: CLR LED2 in atomic operation    
         
         if(MotorPhaseA == 1)
             MotorPhaseA = ADC1BUF0;
-        else if(MotorPhaseB == 1)
+        if(MotorPhaseB == 1)
             MotorPhaseB = ADC1BUF0;
-        else if(MotorPhaseC == 1)
+        if(MotorPhaseC == 1)
             MotorPhaseC = ADC1BUF0;
          
 		MotorNeutralVoltage = (MotorPhaseA + MotorPhaseB + MotorPhaseC) / 3;
 
 		/********************* ADC SAMPLING & BMEF signals comparison ****************/
-        BlankingCounter++;
+        BlankingCounter++; // ignore ringing from commutation
 		if(BlankingCounter > BLANKING_COUNT) 
         {
 			ComparatorOutputs = 0;						// Precondition all comparator bits as zeros
@@ -265,15 +293,15 @@ void __ISR(_ADC_VECTOR, IPL7SOFT) ADC1Interrupt(void)
 			if(MotorPhaseC > MotorNeutralVoltage)
 				ComparatorOutputs += 4;					// Set bit 2 when Phase C is higher than Neutral
 
-        // Masking the BEMF signals according to the SECTOR in order to determine the ACTIVE BEMF signal
+        // Masking the BEMF signals  according to the SECTOR in order to determine the ACTIVE BEMF signal
         // XOR operator helps to determine the direction of the upcoming zero-crossing slope
 
-            if((ComparatorOutputs^ADC_XOR[ADCCommState])& ADC_MASK[ADCCommState])
-                adcBackEMFFilter|=0x01;
+            if((ComparatorOutputs^ADC_XOR[ADCCommState]) & ADC_MASK[ADCCommState])
+                adcBackEMFFilter |= 0x01;
 
             adcBackEMFFilter = ADC_BEMF_FILTER[adcBackEMFFilter];	//Majority detection filter
 
-            if (adcBackEMFFilter&0b00000001) {
+            if (adcBackEMFFilter & 0b00000001) {
 
 				if(Flags.current_state == STATE_STARTING)
                 {	//When a valid BEMF zero crossing event has been detected, disable the motor start-up sequence
@@ -308,7 +336,6 @@ void __ISR(_ADC_VECTOR, IPL7SOFT) ADC1Interrupt(void)
                 ++stallCount;	//if a BEMF zero crossing was not detected increment the stall counter
         }
         
-        // LATCbits.LATC9 = ~LATCbits.LATC9; // test
         
         //Call the speed controller at a fixed frequency, which is (PI_TICKS*50us)
         if(++PIticks >= PI_TICKS)
@@ -359,7 +386,7 @@ void __attribute__ ((vector(_CCP1_VECTOR), interrupt(IPL3SOFT), micromips)) _CCP
     //rotor stall detection
     if ((stallCount > BEMF_STALL_LIMIT) && (Flags.current_state == STATE_STARTED))
     {
-        Flags.current_state = STATE_FAULT;      //go to FAULT state and restart the motor without pushing the button
+        Flags.current_state = STATE_FAULT;      //go to FAULT state and restart the motor without pushing the button  //######################
         stallCount = 0;     //clear the stall counter
     }
     IFS0bits.CCP1IF = 0;	//clear MCCP Interrupt Flag
@@ -369,7 +396,7 @@ void __attribute__ ((vector(_CCP1_VECTOR), interrupt(IPL3SOFT), micromips)) _CCP
 SCCP2 Interrupt Service Routine()
 	- used to switch (commute) the current driving sector of the motor
 	- ends PreCommutationState
- * Note: same a Timer1 Interrupt in dsPIC33 demo code
+ * Note: same as Timer1 Interrupt in dsPIC33 demo code
 **********************************************************************/
 void __attribute__ ((vector(_CCT2_VECTOR), interrupt(IPL5SOFT), micromips)) _CCT2Interrupt(void)
 {
