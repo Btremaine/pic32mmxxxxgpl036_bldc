@@ -109,19 +109,19 @@ void Init_Peripheral(void)
     Nop();
     Nop();
 
-    // Configure Digital PORTS multiplexed with MCCP as outputs
-    LATAbits.LATA0 = 0;     //PWM1H3, <also LED1 on Dev Board>
-    TRISAbits.TRISA0 = 0;
-    LATAbits.LATA1 = 0;     //PWM1L3
+     // Configure Digital PORTS multiplexed with MCCP as outputs
+    LATAbits.LATA1 = 0;     //PWM1HU                              OCM1F
     TRISAbits.TRISA1 = 0;
-    LATAbits.LATA2 = 0;     //PWM1H2, <also RGB_BLE on Dev Board>
-    TRISAbits.TRISA2 = 0;
-    LATAbits.LATA3 = 0;     //PWM1L2
+    LATAbits.LATA0 = 0;     //PWM1LU, <also LED1 on Dev Board>    OCM1E
+    TRISAbits.TRISA0 = 0;
+    LATAbits.LATA3 = 0;     //PWM1HV                              OCM1D
     TRISAbits.TRISA3 = 0;
-    LATBbits.LATB8 = 0;     //PWM1H1, <also RB8_SCK on Dev Board>
-    TRISBbits.TRISB8 = 0;
-    LATBbits.LATB9 = 0;     //PWM1L1
+    LATAbits.LATA2 = 0;     //PWM1LV, <also RGB_BLE on Dev Board> OCM1C
+    TRISAbits.TRISA2 = 0;
+    LATBbits.LATB9 = 0;     //PWM1HW                              OCM1B
     TRISBbits.TRISB9 = 0;
+    LATBbits.LATB8 = 0;     //PWM1LW, <also RB8_SCK on Dev Board> OCM1A
+    TRISBbits.TRISB8 = 0;
 
     // Push Button pins
 #if defined CURIOS_DEV
@@ -131,8 +131,8 @@ void Init_Peripheral(void)
     LATBbits.LATB13 = 0;     // S2
     TRISBbits.TRISB13 = 1;
     
-    LATAbits.LATA0 = 0;      // LED1
-    TRISAbits.TRISA0 = 0;   
+    //LATAbits.LATA0 = 0;      // LED1 see digital ports
+    //TRISAbits.TRISA0 = 0;   
     
     LATCbits.LATC9 = 0;      // LED2
     TRISCbits.TRISC9 = 0;
@@ -156,12 +156,13 @@ void Init_ADC(void)
 
     AD1CON1bits.SIDL = 0;      // continues operation in idle mode
     AD1CON1bits.FORM = 0;      // int 16bit format
-    AD1CON1bits.SSRC = 6;      // timer1 ends sampling starts conversion
+    AD1CON1bits.SSRC = 8;      // was timer1 ends sampling starts conversion, change to MCCP1
     AD1CON1bits.MODE12 = 0;    // 10-bit mode
     AD1CON1bits.ASAM = 1;      // automatic sampling
     
     AD1CHSbits.CH0SA = POT;    // temporary channel setting for now
-    AD1CON3bits.ADCS = 3;      // conversion 3*Tsrc
+    
+    AD1CON3bits.ADCS = 12;      // conversion 12*Tsrc (1 per bit + 2)
     AD1CON3bits.SAMC = 2;      // sample 2*Tsrc
     AD1CON3bits.EXTSAM = 0;    // stop sampling when SAMP=0
     AD1CON3bits.ADRC = 0;      // clock derived from peripheral bus
@@ -224,6 +225,7 @@ void Init_Timers(void)
     TMR1 = 0;                   // Resetting timer 1
     PR1 = ((FCY/FPWM)/7 - 1);   // Frequency at which Timer1 triggers ADC. About 6 ADCs every PWM.
     T1CONbits.TCS = 0;          // internal peripheral clock
+    
     // ======================== // SCCP2:
     CCP2CON1bits.CCSEL = 0;     // Set SCCP2 operating mode, Output Compare/PWM or Timer mode 
     CCP2CON1bits.MOD = 0;       // Set mode to 16/32 bit timer mode
