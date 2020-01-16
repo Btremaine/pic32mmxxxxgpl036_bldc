@@ -61,14 +61,14 @@
 
 //########### Motor Control Definitions #################
 #if defined CURIOS_DEV  
-    #define STARTUP_DUTY            240     //sets the starting motor speed in forced commutation mode; Fsys & Fpwm dependent
+    #define STARTUP_DUTY            800     //sets the starting motor speed in forced commutation mode; Fsys & Fpwm dependent
     #define STARTUP_RPM             1000	//final RPM after startup. this becomes the minimum RPM#define MIN_RPM 
     #define MIN_RPM                 750     // motor RPM at MIN_MOTOR_SPEED_REF
     #define MAX_RPM                 2400    // motor RPM at MAX_MOTOR_SPEED_REF
     #define POLEPAIRS               6       // Number of pole pairs of the motor
 
-    #define RAMPDELAY_START         40      //in ms; the starting sector comutation period
-    #define RAMPDELAY_MIN           4       //in ms; minimum period for startup ramp; when reaching this value, it will start looking for BEMF
+    #define RAMPDELAY_START         800     //in ms; the starting sector comutation period
+    #define RAMPDELAY_MIN            50     //in ms; minimum period for startup ramp; when reaching this value, it will start looking for BEMF
 
     #define BLANKING_COUNT          2       // Blanking count expressed in PWM periods used to avoid false zero-crossing detection after commutating motor
     #define BEMF_STALL_LIMIT        5000     // If no BEMF signal is detected for (BEMF_STALL_LIMIT*BLANKING_COUNT * 50us) then it is assumed the rotor is stalled
@@ -79,10 +79,10 @@
 
     #define RPM_PWM_FACTOR (uint16_t)(32768 * ((float)MAX_MOTOR_SPEED_REF / (float)MAX_RPM))	//PWM Duty cycle = RPM_PWM_FACTOR * Speed_in_RPM
 
-    #define BEMF_VDDMAX             400          
-    /*	on CURIOS_DEV:
+    #define BEMF_VDDMAX             1024          
+    /*	on CURIOS_DEV with :
         R10/(R10+R14) * DC Voltage / 3.3 V * 1024
-        2K/32K * 24 / 3.3 * 1024 = 465 
+        4.7K/(4.7K+2.4K) * [5V] = 3.3V ; 3.3V * (1024/3.3V) = 1024
     */
 #endif
 
@@ -127,15 +127,14 @@ enum {
 
  typedef struct
 {
-    unsigned RunMotor : 1;
-    unsigned Startup : 1;
-    unsigned CLKW : 1;
-    unsigned newCLKW : 1;
-    unsigned PreCommutationState : 1;
-    unsigned PotRead : 1;
-    unsigned DMCI_Control_SW : 1;
-    unsigned current_state : 3;
-    unsigned unused : 1;
+    unsigned RunMotor ;
+    unsigned Startup ;
+    unsigned CLKW ;
+    unsigned newCLKW ;
+    unsigned PreCommutationState ;
+    unsigned PotRead ;
+    unsigned DMCI_Control_SW ;
+    unsigned current_state ;
 } TFlags;
 
 TFlags volatile Flags;
