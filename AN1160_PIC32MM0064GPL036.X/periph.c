@@ -132,14 +132,14 @@ void Init_Peripheral(void)
     TRISBbits.TRISB13 = 1;
     
     //LATAbits.LATA0 = 0;      // LED1 see digital ports
-    //TRISAbits.TRISA0 = 0;   
+    //TRISAbits.TRISA0 = 0;  
+    
+    LATBbits.LATB12 = 0;     // LED3 Green
+    TRISBbits.TRISB12 = 0;   
     
     LATCbits.LATC9 = 0;      // LED2
     TRISCbits.TRISC9 = 0;
-    
-    LATBbits.LATB2 = 0;      // debug, RB2
-    TRISBbits.TRISB2 = 0;
-    
+      
 #endif
   
     EnableInterrupts();
@@ -156,13 +156,13 @@ void Init_ADC(void)
 
     AD1CON1bits.SIDL = 0;      // continues operation in idle mode
     AD1CON1bits.FORM = 0;      // int 16bit format
-    AD1CON1bits.SSRC = 8;      // was timer1 ends sampling starts conversion, change to MCCP1
+    AD1CON1bits.SSRC = 5;      // timer1 ends sampling starts conversion
     AD1CON1bits.MODE12 = 0;    // 10-bit mode
     AD1CON1bits.ASAM = 1;      // automatic sampling
     
     AD1CHSbits.CH0SA = POT;    // temporary channel setting for now
     
-    AD1CON3bits.ADCS = 12;      // conversion 12*Tsrc (1 per bit + 2)
+    AD1CON3bits.ADCS = 12;     // conversion 12*Tsrc (1 per bit + 2)
     AD1CON3bits.SAMC = 2;      // sample 2*Tsrc
     AD1CON3bits.EXTSAM = 0;    // stop sampling when SAMP=0
     AD1CON3bits.ADRC = 0;      // clock derived from peripheral bus
@@ -222,11 +222,13 @@ void Init_MCCP(void)
 void Init_Timers(void)
 {
     // ======================== // Timer 1
+    T1CONbits.ON = 0;
     TMR1 = 0;                   // Resetting timer 1
     PR1 = ((FCY/FPWM)/7 - 1);   // Frequency at which Timer1 triggers ADC. About 6 ADCs every PWM.
     T1CONbits.TCS = 0;          // internal peripheral clock
     
     // ======================== // SCCP2:
+    CCP2CON1bits.ON = 0;        // Stop SCCP2
     CCP2CON1bits.CCSEL = 0;     // Set SCCP2 operating mode, Output Compare/PWM or Timer mode 
     CCP2CON1bits.MOD = 0;       // Set mode to 16/32 bit timer mode
     CCP2CON1bits.T32 = 0;       // Set timebase width (16-bit)
@@ -262,3 +264,16 @@ void Init_Timers(void)
     T1CONbits.ON = 0;           // Stop Timer1
 }
 
+void Toggle_LED2(void)
+{
+   LATCSET = (0b1000000000);  // test: SET LED2 in atomic operation 
+   Nop(); Nop(); Nop(); Nop();
+   LATCCLR = (0b1000000000);  // test: CLR LED2 in atomic operation  
+}
+
+void Toggle_LED3(void)
+{
+    LATBSET = (0b1000000000000);  // test: SET LED3 in atomic operation 
+    Nop(); Nop(); Nop(); Nop();
+    LATBCLR = (0b1000000000000);  // test: CLR LED3 in atomic operation          
+}

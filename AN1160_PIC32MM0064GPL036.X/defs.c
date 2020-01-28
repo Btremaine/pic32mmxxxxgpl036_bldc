@@ -38,38 +38,38 @@ uint32_t SpeedControl_P = PI_P_TERM; // The P term for the PI speed control loop
 uint32_t SpeedControl_I = PI_I_TERM; // The I term for the PI speed control loop
 
 const uint32_t PWM_STATE_CLKW[6] =	// 1/15/20 verified does step CLKW
-            {0x12000000,0x18000000,0x09000000,0x21000000,0x24000000,0x06000000};
+            {0x24000000,0x21000000,0x09000000,0x18000000,0x12000000,0x06000000};  // okay
 uint32_t PWM_STATE[6];
 
-const uint32_t MotorPhaseAState_CLKW[6] = {0, 1, BEMF_VDDMAX, BEMF_VDDMAX, 1, 0};
-const uint32_t MotorPhaseBState_CLKW[6] = {1, 0, 0, 1, BEMF_VDDMAX, BEMF_VDDMAX};
-const uint32_t MotorPhaseCState_CLKW[6] = {BEMF_VDDMAX, BEMF_VDDMAX, 1, 0, 0, 1};
+// to equate with schematic equate {U,V,W} == {A,B,C}
+// 0==Gnd, 1==open, BEMF_VDDMAX==driven
+const uint32_t MotorPhaseAState_CLKW[6] = {BEMF_VDDMAX, BEMF_VDDMAX, 1, 0, 0, 1}; // U, check
+const uint32_t MotorPhaseBState_CLKW[6] = {0, 1, BEMF_VDDMAX, BEMF_VDDMAX, 1, 0}; // V, check
+const uint32_t MotorPhaseCState_CLKW[6] = {1, 0, 0, 1, BEMF_VDDMAX, BEMF_VDDMAX}; // W, check
 
 uint32_t MotorPhaseAState[6];
 uint32_t MotorPhaseBState[6];
 uint32_t MotorPhaseCState[6];
 
 // define ADC channels #'s used for reading U, V & W as well as neutral
-#if 1
-    const uint16_t ADC_CHANNEL_CLKW[6] = {0x0003,0x0002,0x0004,0x0003,0x0002,0x0004};
-#else
-const uint16_t ADC_CHANNEL_CLKW[6] = {0x000b,0x000b,0x000b,0x000b,0x000b,0x000b};  // debug adc
-#endif
+const uint16_t ADC_CHANNEL_CLKW[6] = {0x0004,0x0003,0x0002,0x0004,0x0003,0x0002}; // okay
 uint16_t ADC_CHANNEL[6];
 
-const uint16_t ADC_MASK_CLKW[6]	=   {0x0002,0x0001,0x0004,0x0002,0x0001,0x0004};
+const uint16_t ADC_MASK_CLKW[6]	=   {0x0004,0x0002,0x0001,0x0004,0x0002,0x0001};  // check
 uint16_t ADC_MASK[6];
 
-const uint16_t ADC_XOR_CLKW[6]	=   {0x0000,0xFFFF,0x0000,0xFFFF,0x0000,0xFFFF};
+const uint16_t ADC_XOR_CLKW[6]	=   {0x0000,0xFFFF,0x0000,0xFFFF,0x0000,0xFFFF};  // check 1/24
 uint16_t ADC_XOR[6];
 
-const uint8_t ADC_BEMF_FILTER_CLKW[64]=
+const uint8_t ADC_BEMF_FILTER_CLKW[64]=                                           // check
     {0x00,0x02,0x04,0x06,0x08,0x0A,0x0C,0x0E,0x10,0x12,0x14,0x16,0x18,0x1A,0x1C,0x1E,
      0x20,0x22,0x24,0x26,0x28,0x2A,0x2C,0x2E,0x01,0x01,0x01,0x36,0x01,0x3A,0x3C,0x3E,
      0x00,0x02,0x04,0x06,0x08,0x0A,0x0C,0x0E,0x01,0x01,0x01,0x16,0x01,0x1A,0x1C,0x1E,
      0x01,0x01,0x01,0x26,0x01,0x2A,0x2C,0x2E,0x01,0x01,0x01,0x36,0x01,0x3A,0x3C,0x3E};
 
 uint8_t ADC_BEMF_FILTER[64];
+uint8_t buffer_filter[100];
+uint8_t buffer_pntr;
 
 uint8_t ADCCommState;
 uint8_t adcBackEMFFilter;
@@ -151,11 +151,21 @@ void OpenLoopController(void)
 void DelayNmSec(uint32_t N)
 {
     // busy-waiting delay using PWM ISR, count in milli-seconds
-    // original code was configured as 100us by mistake (?).
+    // original code was configured as 100us by mistake (?).    
     while(N--)
     {
         delay_counter = 0;
         while(delay_counter < PWM_1000us_FACTOR);
     }
 }
+
+// for debug without isr's or timers, use core timer
+void DelayCycles(uint32_t n)
+{
+    uint32_t StartTime;
+    StartTime = _CP0_GET_COUNT();
+    while( (uint32_t) (_CP0_GET_COUNT() - StartTime) < n) {};
+    
+}
+
 //end of definitions

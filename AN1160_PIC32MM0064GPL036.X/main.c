@@ -1,4 +1,5 @@
-/* *********************************************************************
+
+ /* *********************************************************************
  * (c) 2017 Microchip Technology Inc. and its subsidiaries. You may use
  * this software and any derivatives exclusively with Microchip products.
  *
@@ -38,7 +39,7 @@
  *   S1: start/stop switch
  *   S2: not used
  * 
-* *************************************************************************** */
+* ****************************************************************************/
 #include "defs.h"		//defines, function headers, pi, etc
 #include <xc.h>
 #include <sys/attribs.h>
@@ -53,28 +54,33 @@ int32_t main(void)
     Flags.CLKW = 0;     // Java runs CCW
     
     // ----------this section for debug only -------------------------------
-    while (0) {  // debug RA3 & RB3 do toggle okay 1/15/20
-        LATAINV = (0b0000001000);  // test: RA3 (J3-9,10) : OCM1A
-        LATBINV = (0b0100000000);  // test: RB8 (J2-5,6) : OCM1D
-    }
-      
     if (0) {     // debug CLKW vs CCW
         ADCCommState = 5;
-        CCP1RBbits.CMPB = 800;
-        int32_t i = ADCCommState;
+        CCP1RBbits.CMPB = 600;
         
+        int32_t i = ADCCommState; 
         while(1) {
-           //LATCINV = (0b1000000000);  // test: toggle LED2 in atomic operation 
-           DelayNmSec(1000); 
+           LATCINV = (0b1000000000);  // test: toggle LED2 in atomic operation 
+           DelayCycles(24000000); 
            CCP1CON2 = ((CCP1CON2 & 0XC0FFFFFF) | PWM_STATE_CLKW[5-i]);  
            i--; 
            if (i<0)
                i = ADCCommState;
         }
     }
+    if(0) { // test timer1, runs adc ISR 
+        while(1) {
+        if (T1CONbits.TON == 0)
+            T1CONbits.TON = 1;  
+        }
+    }
     // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^  
+    
+    // for remote debug:
+    //Flags.current_state = STATE_STARTING;
+    
     while(1) {
-          
+        
 #if defined CURIOS_DEV
         if(S1)
         { //start/stop switch
@@ -107,13 +113,14 @@ int32_t main(void)
                 break;
             
             case STATE_STARTED:
-                // gets changed in ISR
+                // gets changed in ADC ISR
                 break;
 
             case STATE_FAULT:
                 Stop_Motor();
-                DelayNmSec(1000);   //delay for motor to actually stop
+                DelayNmSec(600);   //delay for motor to actually stop
                 Flags.current_state = STATE_STARTING;
+                Flags.Startup == 0;   // added bpt 1/20/20
                 break;
             
         } // end case
@@ -180,7 +187,7 @@ void Init_Motor()
     RampDelay = RAMPDELAY_START;	//startup initial delay. also the delay used to hold the rotor for the first sector
         
     CCP1CON2 = ((CCP1CON2 & 0XC0FFFFFF) | PWM_STATE[ADCCommState]); //set PWM overdrive according to the PWM channel   
-    CurrentSpeed = STARTUP_DUTY;   //Initialize PWM duty cycle value to minimum duty allowed
+    CurrentSpeed = STARTUP_DUTY;   //Initialize PWM duty cycle value to minimum duty allowed for startup
     CCP1RBbits.CMPB = CurrentSpeed;
     
     DelayNmSec(40);  // ?? what purpose is this delay???  
@@ -200,15 +207,16 @@ void Start_Motor()
 {
     if(++ADCCommState >5)	// Change The Six-Step Commutation Sector
         ADCCommState = 0;
-
-    AD1CHSbits.CH0SA = ADC_CHANNEL[ADCCommState];	//Change ADC Channel AN Selection
+    //Change ADC Channel AN Selection
+    AD1CHSbits.CH0SA = ADC_CHANNEL[ADCCommState];	
     
-    //non-linear RAMP for startup.
+    // non-linear RAMP for startup.
+    // ===============================================================
     if(RampDelay > 10)
-        RampDelay -= 10;
+        RampDelay -= 1; // was 10
     else
-	if(RampDelay > 3)
-            RampDelay -= 3;
+	if(RampDelay > 5)
+            RampDelay -= 2;
 
     if(RampDelay <= RAMPDELAY_MIN)
     {
@@ -216,8 +224,8 @@ void Start_Motor()
         //BEMF Detection is started by starting Timer1, which will trigger ADC
         RampDelay = RAMPDELAY_MIN;
         CurrentSpeed = MIN_MOTOR_SPEED_REF;		//this is mainly for OpenLoopController, to start from a lower value
-        if (T1CONbits.TON == 0)
-            T1CONbits.TON = 1;
+        //if (T1CONbits.TON == 0)
+        //    T1CONbits.TON = 1;
     }
     
     CCP1CON2 = ((CCP1CON2 & 0XC0FFFFFF) | PWM_STATE[ADCCommState]);	//overdrive and output next motor sector
@@ -257,10 +265,15 @@ phase, apply the majority detection filter, and find the zero-crossing point.
 Here we also read the potentiometer and execute the control loop for
 the algorithm ( PI or Open loop ).
 ******************************************************************************/
-//void __attribute__ ((vector(_ADC_VECTOR), interrupt(IPL7SOFT), micromips)) _ADC1Interrupt(void)
-void __ISR(_ADC_VECTOR, IPL7SOFT) ADC1Interrupt(void)
+void __ISR(_ADC_VECTOR, IPL7SOFT) ADC1Interrupt(void) 
 {  
-    if(Flags.PreCommutationState == 0)
+    // trigger t.p. for ADC
+    ///Toggle_LED2();  
+    
+    // one sample stop timer 1
+    T1CONbits.TON = 0;
+       
+    if (Flags.PreCommutationState == 0)
     {   // this code assumes neutral is predefined with GND==0 & BEMF_VDDMAX
         // not as accurate but saves processor time.
         MotorPhaseA = MotorPhaseAState[ADCCommState];
@@ -268,9 +281,7 @@ void __ISR(_ADC_VECTOR, IPL7SOFT) ADC1Interrupt(void)
 		MotorPhaseC = MotorPhaseCState[ADCCommState];
         
         // trigger t.p. for ADC
-        LATCSET = (0b1000000000);  // test: SET LED2 in atomic operation 
-        Nop(); Nop(); Nop(); Nop();
-        LATCCLR = (0b1000000000);  // test: CLR LED2 in atomic operation    
+        //Toggle_LED2();   
         
         if(MotorPhaseA == 1)
             MotorPhaseA = ADC1BUF0;
@@ -281,10 +292,12 @@ void __ISR(_ADC_VECTOR, IPL7SOFT) ADC1Interrupt(void)
          
 		MotorNeutralVoltage = (MotorPhaseA + MotorPhaseB + MotorPhaseC) / 3;
 
-		/********************* ADC SAMPLING & BMEF signals comparison ****************/
+		//********************* ADC SAMPLING & BMEF signals comparison ****************
         BlankingCounter++; // ignore ringing from commutation
-		if(BlankingCounter > BLANKING_COUNT) 
+		if(BlankingCounter > BLANKING_COUNT)     // 1/23/20 appears to work, set at 3 periods
         {
+            Toggle_LED3();
+            
 			ComparatorOutputs = 0;						// Precondition all comparator bits as zeros
 			if(MotorPhaseA > MotorNeutralVoltage)
 				ComparatorOutputs += 1;					// Set bit 0 when Phase A is higher than Neutral
@@ -295,12 +308,15 @@ void __ISR(_ADC_VECTOR, IPL7SOFT) ADC1Interrupt(void)
 
         // Masking the BEMF signals  according to the SECTOR in order to determine the ACTIVE BEMF signal
         // XOR operator helps to determine the direction of the upcoming zero-crossing slope
-
+            // ADC_XOR is 0x0000 or 0xFFFF; ADC_MASK selects bit 0, 1, or 2 that is active ADC 
             if((ComparatorOutputs^ADC_XOR[ADCCommState]) & ADC_MASK[ADCCommState])
                 adcBackEMFFilter |= 0x01;
 
+            buffer_filter[buffer_pntr++] = ComparatorOutputs; adcBackEMFFilter;
+            if(buffer_pntr>99) buffer_pntr = 0;
+            
             adcBackEMFFilter = ADC_BEMF_FILTER[adcBackEMFFilter];	//Majority detection filter
-
+            
             if (adcBackEMFFilter & 0b00000001) {
 
 				if(Flags.current_state == STATE_STARTING)
@@ -311,9 +327,11 @@ void __ISR(_ADC_VECTOR, IPL7SOFT) ADC1Interrupt(void)
 
                 stallCount = 0;					//clear the stall counter whenever the BEMF signal is detected
 				Flags.PreCommutationState = 1;	//set pre-commutation state flag
+                
+                Toggle_LED2();
 
 				// Calculate the time proportional to the 60 electrical degrees
-    			CCP3CON1bits.ON = 0;  // Stop SCCP3 Timer 
+    			CCP3CON1bits.ON = 0;  // Stop SCCP3 Timer (similar to timer2 in dsPIC33 code)
     			SCCP3Average = ((SCCP3Average + SCCP3Value + 2*CCP3TMRbits.TMRL)>>2);
     			SCCP3Value = CCP3TMRbits.TMRL;
     			CCP3TMRbits.TMRL = 0;
@@ -359,13 +377,15 @@ void __ISR(_ADC_VECTOR, IPL7SOFT) ADC1Interrupt(void)
 			}
             else
             {
-                DesiredRPM = (unsigned int)(( (unsigned long)ADC1BUF0 * (MAX_RPM-MIN_RPM) ) >> 10 ) + MIN_RPM;
-                DesiredSpeed = (unsigned int)(((unsigned long)DesiredRPM * RPM_PWM_FACTOR) >> 15);
+                DesiredRPM = (unsigned int)(( (unsigned long)ADC1BUF0 * (MAX_RPM-MIN_RPM) ) >> 10 ) + MIN_RPM; // value in RPM
+                DesiredSpeed = (unsigned int)(((unsigned long)DesiredRPM * RPM_PWM_FACTOR) >> 15);  // value of PWM
             }
 		}
         else
-			DesiredSpeed = (unsigned int)(((unsigned long)DesiredRPM * RPM_PWM_FACTOR) >> 15);
+			DesiredSpeed = (unsigned int)(((unsigned long)DesiredRPM * RPM_PWM_FACTOR) >> 15);  // value of PWM
     }
+    
+    
 	AD1CON1bits.DONE = 0;
 	IFS0bits.AD1IF = 0;
 }
@@ -380,9 +400,11 @@ MCCP Interrupt Service Routine()
 **********************************************************************/
 void __attribute__ ((vector(_CCP1_VECTOR), interrupt(IPL3SOFT), micromips)) _CCP1Interrupt(void)
 {
-    // LATCINV = (0b1000000000);  // test: toggle LED2 in atomic operation  
+    //LATCINV = (0b1000000000);  // test: toggle LED2 in atomic operation  
     
     delay_counter++;
+    if (T1CONbits.TON == 0)
+        T1CONbits.TON = 1;
     //rotor stall detection
     if ((stallCount > BEMF_STALL_LIMIT) && (Flags.current_state == STATE_STARTED))
     {
@@ -402,6 +424,9 @@ void __attribute__ ((vector(_CCT2_VECTOR), interrupt(IPL5SOFT), micromips)) _CCT
 {
     adcBackEMFFilter = 0;
     BlankingCounter = 0;
+    
+    buffer_filter[buffer_pntr++] = 0xff;
+    if(buffer_pntr>99) buffer_pntr = 0;
 
     if (++ADCCommState > 5)
         ADCCommState = 0;
