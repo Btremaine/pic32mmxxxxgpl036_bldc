@@ -37,8 +37,16 @@
 uint32_t SpeedControl_P = PI_P_TERM; // The P term for the PI speed control loop
 uint32_t SpeedControl_I = PI_I_TERM; // The I term for the PI speed control loop
 
+#ifdef CLASSIC
+const uint32_t PWM_STATE_CLKW[6] =	
+            {0x20000000,0x20000000,0x08000000,0x08000000,0x02000000,0x02000000};  //
+const uint8_t LOW_SIDE_CLKW[6] =
+            {0x02,0x01,0x01,0x04,0x04,0x02};
+uint8_t LOW_SIDE[6];
+#else
 const uint32_t PWM_STATE_CLKW[6] =	// 1/15/20 verified does step CLKW
             {0x24000000,0x21000000,0x09000000,0x18000000,0x12000000,0x06000000};  // okay
+#endif
 uint32_t PWM_STATE[6];
 
 // to equate with schematic equate {U,V,W} == {A,B,C}
@@ -68,8 +76,13 @@ const uint8_t ADC_BEMF_FILTER_CLKW[64]=                                         
      0x01,0x01,0x01,0x26,0x01,0x2A,0x2C,0x2E,0x01,0x01,0x01,0x36,0x01,0x3A,0x3C,0x3E};
 
 uint8_t ADC_BEMF_FILTER[64];
-uint8_t buffer_filter[100];
-uint8_t buffer_pntr;
+
+uint8_t bemf_filter[64];
+uint8_t bemf_pntr;
+
+uint16_t adcA_buffer[256];
+uint16_t adc_pntr;
+bool Fg;
 
 uint8_t ADCCommState;
 uint8_t adcBackEMFFilter;
@@ -78,6 +91,7 @@ uint16_t PhaseAdvanceTicks;
 uint8_t BlankingCounter;
 volatile uint32_t stallCount;
 uint32_t RampDelay;
+volatile uint8_t openLoopSteps;
 uint32_t PIticks;
 
 uint32_t MotorNeutralVoltage;
@@ -105,10 +119,13 @@ tPIParm PIDStructurePha;
 ***************************************************/
 void SpeedPILoopController(void)
 {
-    // Normalizing SCCP3 Timer counts to electrical RPS expressed in PWM counts
-    // SCCP3 Timer Counts are converted to PWM counts
-    // and then multiplied by the number of sector
-    // required to complete 1 electrical RPS
+    // Original Method: Normalizing SCCP3 Timer counts to electrical RPS expressed in PWM counts
+    //                  SCCP3 Timer Counts are converted to PWM counts
+    //                  and then multiplied by the number of sector
+    //                  required to complete 1 electrical RPS
+    // Modified method: Period of Fg is captured using Counter0
+    //
+    //
     CurrentSpeed = (uint16_t)(SPEEDMULT/SCCP3Average);     
     PIDStructureVel.InRef = DesiredSpeed;
     PIDStructureVel.InMeas = CurrentSpeed;
@@ -160,6 +177,7 @@ void DelayNmSec(uint32_t N)
 }
 
 // for debug without isr's or timers, use core timer
+// increments on every 2nd instruction
 void DelayCycles(uint32_t n)
 {
     uint32_t StartTime;

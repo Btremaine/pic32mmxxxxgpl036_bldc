@@ -1,4 +1,3 @@
-
 /* *********************************************************************
  * (c) 2017 Microchip Technology Inc. and its subsidiaries. You may use
  * this software and any derivatives exclusively with Microchip products.
@@ -62,8 +61,8 @@
 
 // FOSCSEL
 #pragma config FNOSC = PLL
-#pragma config PLLSRC = FRC             // System PLL Input Clock Selection bit (FRC oscillator internal fast oscillator)
-#pragma config SOSCEN = ON              // Secondary osc enable
+#pragma config PLLSRC = FRC             // System PLL Input Clock Selection bit (FRC oscillator is selected as PLL reference input on device reset)
+#pragma config SOSCEN = ON
 #pragma config IESO = ON                // Two Speed Startup Enable bit (Two speed startup is enabled)
 #pragma config POSCMOD = OFF            // Primary Oscillator Selection bit (Primary oscillator is disabled)
 #pragma config OSCIOFNC = OFF           // System Clock on CLKO Pin Enable bit (OSCO pin operates as a normal I/O)
@@ -110,21 +109,21 @@ void Init_Peripheral(void)
     Nop();
 
      // Configure Digital PORTS multiplexed with MCCP as outputs
-    LATAbits.LATA1 = 0;     //PWM1HU                              OCM1F
+    LATAbits.LATA1 = 0;     //PWM1HU                              OCM1F MCCP
     TRISAbits.TRISA1 = 0;
-    LATAbits.LATA0 = 0;     //PWM1LU, <also LED1 on Dev Board>    OCM1E
+    LATAbits.LATA0 = 0;     //PWM1LU, <also LED1 on Dev Board>    OCM1E port
     TRISAbits.TRISA0 = 0;
-    LATAbits.LATA3 = 0;     //PWM1HV                              OCM1D
+    LATAbits.LATA3 = 0;     //PWM1HV                              OCM1D MCCP
     TRISAbits.TRISA3 = 0;
-    LATAbits.LATA2 = 0;     //PWM1LV, <also RGB_BLE on Dev Board> OCM1C
+    LATAbits.LATA2 = 0;     //PWM1LV, <also RGB_BLE on Dev Board> OCM1C port
     TRISAbits.TRISA2 = 0;
-    LATBbits.LATB9 = 0;     //PWM1HW                              OCM1B
+    LATBbits.LATB9 = 0;     //PWM1HW                              OCM1B MCCP
     TRISBbits.TRISB9 = 0;
-    LATBbits.LATB8 = 0;     //PWM1LW, <also RB8_SCK on Dev Board> OCM1A
+    LATBbits.LATB8 = 0;     //PWM1LW, <also RB8_SCK on Dev Board> OCM1A port
     TRISBbits.TRISB8 = 0;
 
     // Push Button pins
-#if defined CURIOS_DEV
+#if defined CURIOS_DEV    
     LATBbits.LATB7 = 0;     // S1
     TRISBbits.TRISB7 = 1;
  
@@ -163,7 +162,7 @@ void Init_ADC(void)
     AD1CHSbits.CH0SA = POT;    // temporary channel setting for now
     
     AD1CON3bits.ADCS = 12;     // conversion 12*Tsrc (1 per bit + 2)
-    AD1CON3bits.SAMC = 2;      // sample 2*Tsrc
+    AD1CON3bits.SAMC = 4;      // sample 4*Tsrc
     AD1CON3bits.EXTSAM = 0;    // stop sampling when SAMP=0
     AD1CON3bits.ADRC = 0;      // clock derived from peripheral bus
     
@@ -193,7 +192,10 @@ void Init_MCCP(void)
     CCP1CON1bits.SYNC = 0b00000;    // Select Sync/Trigger source (Self-sync)
     
     //Configure MCCP output for PWM signal
+    // MCCP enables set in code, ports manually written
     CCP1CON2 = 0x0000;
+
+    //Configure MCCP output for PWM signal
     CCP1CON2bits.OCAEN = 0;         // Control desired output signals (OC1A)
     CCP1CON2bits.OCBEN = 0;         // Control desired output signals (OC1B)
     CCP1CON2bits.OCCEN = 0;         // Control desired output signals (OC1C)
@@ -267,13 +269,23 @@ void Init_Timers(void)
 void Toggle_LED2(void)
 {
    LATCSET = (0b1000000000);  // test: SET LED2 in atomic operation 
-   Nop(); Nop(); Nop(); Nop();
+   Nop(); Nop(); Nop(); Nop();Nop(); Nop(); Nop(); Nop();
    LATCCLR = (0b1000000000);  // test: CLR LED2 in atomic operation  
 }
 
 void Toggle_LED3(void)
 {
     LATBSET = (0b1000000000000);  // test: SET LED3 in atomic operation 
-    Nop(); Nop(); Nop(); Nop();
+    Nop(); Nop(); Nop(); Nop(); 
     LATBCLR = (0b1000000000000);  // test: CLR LED3 in atomic operation          
+}
+
+void Set_LED2(void)
+{
+   LATCSET = (0b1000000000);  // test: SET LED2 in atomic operation  
+}
+
+void Clr_LED2(void)
+{
+    LATCCLR = (0b1000000000);  // test: CLR LED2 in atomic operation          
 }
